@@ -1,0 +1,57 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Determine Version
+      id: vars
+      run: |
+        if [[ "${{ github.ref }}" == 'refs/heads/main' ]]; then
+          echo "VERSION=latest" >> $GITHUB_ENV
+        else
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          SAFE_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "VERSION=${SAFE_BRANCH_NAME}-${SHORT_SHA}-SNAPSHOT" >> $GITHUB_ENV
+        fi
+
+    - name: Update package version
+      if: env.VERSION != 'latest'
+      run: npm version ${{ env.VERSION }} --no-git-tag-version --allow-same-version
+
+    - name: Generate API Client
+      run: npm run api:generate
+      
+    - name: Run Tests
+      run: npm test -- --run
+      
+    - name: Build
+      run: npm run build

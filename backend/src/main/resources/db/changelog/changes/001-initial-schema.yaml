@@ -1,0 +1,80 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: javafreedom
+      changes:
+        - createTable:
+            tableName: profiles
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: previous_profile_id
+                  type: uuid
+                  constraints:
+                    nullable: true
+                    foreignKeyName: fk_profiles_previous_profile_id
+                    references: profiles(id)
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: insulin_type
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: units
+                  type: varchar(20)
+                  defaultValue: "mg/dl"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: duration_of_action
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: time_zone
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: segments
+                  type: jsonb
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: 2
+      author: javafreedom
+      changes:
+        - createIndex:
+            tableName: profiles
+            indexName: IDX_PROFILES_USER_ACTIVE
+            columns:
+              - column:
+                  name: user_id
+            unique: true
+            where: status = 'ACTIVE'
