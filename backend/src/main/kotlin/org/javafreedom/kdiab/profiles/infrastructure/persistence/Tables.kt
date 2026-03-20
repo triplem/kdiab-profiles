@@ -49,3 +49,12 @@ object Profiles : Table("profiles") {
         )
     }
 }
+
+object Insulins : Table("insulins") {
+    private const val NAME_LENGTH = 255
+
+    val id = uuid("id")
+    val name = varchar("name", NAME_LENGTH).uniqueIndex()
+
+    override val primaryKey = PrimaryKey(id)
+}

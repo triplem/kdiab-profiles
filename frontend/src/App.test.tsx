@@ -1,7 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import App from './App';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TimeFormatProvider } from './context/TimeFormatContext';
 import { vi, test, expect } from 'vitest';
 import { api } from './api/client';
+
+vi.mock('react-oidc-context', () => ({
+  useAuth: vi.fn(),
+}));
+import { useAuth } from 'react-oidc-context';
 
 // Mock the API client globally for this test file
 vi.mock('./api/client', () => ({
@@ -17,10 +24,32 @@ test('renders main heading', async () => {
   // to avoid "act" warnings if possible, though mostly harmless here.
   (api.listProfiles as any).mockResolvedValue({ data: [] });
 
-  render(<App />);
+  (useAuth as any).mockReturnValue({
+    isLoading: false,
+    error: null,
+    isAuthenticated: true,
+    user: {
+      profile: {
+        sub: '11111111-1111-1111-1111-111111111111',
+        name: 'Sarah Patient',
+        preferred_username: 'sarah'
+      }
+    },
+    signinRedirect: vi.fn(),
+    removeUser: vi.fn()
+  });
+
+  const queryClient = new QueryClient();
+  render(
+    <QueryClientProvider client={queryClient}>
+      <TimeFormatProvider>
+        <App />
+      </TimeFormatProvider>
+    </QueryClientProvider>
+  );
   const heading = screen.getByText(/T1D Profile Manager/i);
   expect(heading).toBeInTheDocument();
   
   // Also check if navigation buttons are present
-  expect(screen.getByText(/Create New/i)).toBeInTheDocument();
+  expect(screen.getByText(/Create New Profile/i)).toBeInTheDocument();
 });

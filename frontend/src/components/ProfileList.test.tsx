@@ -8,6 +8,7 @@ import { vi, test, expect, Mock } from 'vitest';
 vi.mock('../api/client', () => ({
   api: {
     listProfiles: vi.fn(),
+    activateProfile: vi.fn(),
   },
 }));
 
@@ -30,10 +31,17 @@ const mockProfiles: Profile[] = [
   },
 ];
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 test('renders profile list', async () => {
   (api.listProfiles as Mock).mockResolvedValue({ data: mockProfiles });
 
-  render(<ProfileList userId="user-1" />);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ProfileList userId="user-1" />
+    </QueryClientProvider>
+  );
 
   // Should show loading initially
   expect(screen.getByText(/loading/i)).toBeInTheDocument();
@@ -48,9 +56,43 @@ test('renders profile list', async () => {
 test('handles fetch error', async () => {
   (api.listProfiles as Mock).mockRejectedValue(new Error('Network error'));
 
-  render(<ProfileList userId="user-1" />);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ProfileList userId="user-1" />
+    </QueryClientProvider>
+  );
 
   await waitFor(() => {
-    expect(screen.getByText(/failed to fetch profiles/i)).toBeInTheDocument();
+    expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+  });
+});
+
+import userEvent from '@testing-library/user-event';
+
+test('activates a draft profile', async () => {
+  const user = userEvent.setup();
+  (api.listProfiles as Mock).mockResolvedValue({ data: mockProfiles });
+  (api.activateProfile as Mock).mockResolvedValue({ data: {} });
+
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ProfileList userId="user-1" />
+    </QueryClientProvider>
+  );
+
+  await waitFor(() => {
+    expect(screen.getByText(/Weekend Profile/i)).toBeInTheDocument();
+  });
+
+  // The Activate button should be present for the Draft profile
+  const activateButton = screen.getByText(/Activate/i);
+  expect(activateButton).toBeInTheDocument();
+
+  await user.click(activateButton);
+
+  await waitFor(() => {
+    expect(api.activateProfile).toHaveBeenCalledWith('user-1', '2');
   });
 });

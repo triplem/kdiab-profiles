@@ -18,8 +18,6 @@ asciidoctor = "4.0.2"
 kotest = "5.8.0"
 liquibase = "4.29.1"
 kotlinx-coroutines = "1.9.0"
-testcontainers = "1.20.1"
-
 [libraries]
 ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
@@ -56,8 +54,6 @@ kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref 
 kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 liquibase-core = { module = "org.liquibase:liquibase-core", version.ref = "liquibase" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
-testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
-
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
@@ -69,4 +65,3 @@ kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 asciidoctor = { id = "org.asciidoctor.jvm.convert", version.ref = "asciidoctor" }
 
 [bundles]
-testcontainers = ["testcontainers-postgresql"]

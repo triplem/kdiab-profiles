@@ -168,6 +168,55 @@ label {
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
+.profile-card {
+  cursor: pointer;
+}
+
+.profile-details {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  animation: slideDown 0.2s ease-out forwards;
+}
+
+.detail-section {
+  margin-bottom: 1rem;
+}
+
+.detail-section h4 {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.detail-section ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.detail-section li {
+  padding: 0.2rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.detail-section li:last-child {
+  border-bottom: none;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .profile-card-header strong {
   font-size: 1.1rem;
   font-weight: 600;

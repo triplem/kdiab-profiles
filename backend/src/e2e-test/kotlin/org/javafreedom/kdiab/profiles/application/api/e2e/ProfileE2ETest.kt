@@ -93,6 +93,7 @@ class ProfileE2ETest :
                                                                                 jwtAudience,
                                                                         "jwt.realm" to jwtRealm,
                                                                         "jwt.secret" to jwtSecret,
+                                                                        "jwt.test" to "true",
                                                                         "storage.driverClassName" to
                                                                                 "org.h2.Driver",
                                                                         "storage.jdbcUrl" to

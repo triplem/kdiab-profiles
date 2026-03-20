@@ -10,6 +10,20 @@ axiosInstance.interceptors.request.use((config) => {
   if (!config.headers['X-Correlation-ID']) {
     config.headers['X-Correlation-ID'] = crypto.randomUUID();
   }
+
+  // Retrieve token from oidc storage
+  const oidcStorageStr = sessionStorage.getItem(`oidc.user:http://localhost:8081/realms/kdiab-profiles:kdiab-frontend`);
+  if (oidcStorageStr) {
+    try {
+      const oidcStorage = JSON.parse(oidcStorageStr);
+      if (oidcStorage && oidcStorage.access_token) {
+        config.headers['Authorization'] = `Bearer ${oidcStorage.access_token}`;
+      }
+    } catch (e) {
+      console.error('Failed to parse OIDC storage', e);
+    }
+  }
+
   return config;
 });
 

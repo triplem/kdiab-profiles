@@ -185,7 +185,8 @@ class ProfileApiTest {
                                         "jwt.audience" to "profile",
                                         "jwt.domain" to "org.javafreedom.kdiab",
                                         "jwt.realm" to "kdiab-profiles",
-                                        "jwt.secret" to "secret"
+                                        "jwt.secret" to "secret",
+                                        "jwt.test" to "true"
                                 )
                 }
                 application { module(service, initDatabase = false) }

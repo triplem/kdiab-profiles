@@ -58,7 +58,6 @@ dependencies {
     
     // Infrastructure
     implementation(libs.liquibase.core)
-    testImplementation(libs.bundles.testcontainers)
     testImplementation(libs.kotlinx.coroutines.test)
 }
 

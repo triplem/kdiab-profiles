@@ -21,7 +21,7 @@ This service allows multiple users to store and manage their Type 1 Diabetes (T1
 === 2.2 Profile Management
 * **Structure**: A Profile consists of:
 ** Name
-** Insulin Type (e.g., Fiasp, Humalog)
+** Insulin Type (Selected from a globally managed list of insulins, e.g., Fiasp, Humalog. Users can add new types if they don't exist.)
 ** Duration of Insulin Action (DIA)
 ** Time Zones (Time-based settings)
 * **Status**:
@@ -37,6 +37,15 @@ This service allows multiple users to store and manage their Type 1 Diabetes (T1
 * **Constraints**:
 ** Activating a new profile must automatically archive the currently active one.
 ** Time segments must cover the full 24-hour cycle.
+
+=== 2.3 Global Insulin Management
+* **Shared Catalog**: There must be a globally managed list of insulins available to all users (stored in a separate table, not queried over all user profiles).
+* **Selection & Addition**: Users can select from this overarching list. If an insulin type does not exist, users must be able to add a new type seamlessly via a dedicated, non-user-specific endpoint.
+
+=== 2.4 User Interface Requirements
+* **Schedule Organization**: The different profile segments (Basal, ICR, ISF) should be presented on distinct tabs to avoid overwhelming vertical scrolling.
+* **Smart Segment Addition**: By default, when a new segment is added to a schedule, it should automatically act as a copy of the previous entry with its start time incremented by exactly one hour.
+* **Time Formatting**: The application must enforce a global "24-hour time" preference (toggle-able) that reliably dictates the display format of all schedule time input fields.
 
 == 3. Architectural Design Records (ADR)
 This section documents the key architectural decisions made regarding the system's design and implementation.

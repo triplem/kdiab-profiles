@@ -1,9 +1,25 @@
 import React, { useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { api } from '../api/client';
-import type { CreateProfileRequest } from '../api/generated';
+import type { CreateProfileRequest, Profile } from '../api/generated';
+import { useQuery } from '@tanstack/react-query';
+import { useTimeFormat } from '../context/TimeFormatContext';
+import { TimeInput } from './TimeInput';
+
+const getNextSegment = <T extends { startTime: string, value: number }>(
+  fields: T[], 
+  defaultValue: number
+) => {
+  if (fields.length === 0) return { startTime: "00:00", value: defaultValue };
+  const last = fields[fields.length - 1];
+  const [h, m] = last.startTime.split(':').map(Number);
+  const nextH = (h + 1) % 24;
+  const nextStartTime = `${String(nextH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return { startTime: nextStartTime, value: last.value };
+};
+
 
 // Define Validation Schema
 const timeSegmentSchema = z.object({
@@ -60,21 +76,53 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 interface ProfileEditorProps {
   userId: string;
+  initialProfile?: Profile;
   onProfileSaved?: () => void;
 }
 
-export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, onProfileSaved }) => {
-  const { register, control, handleSubmit, formState: { errors } } = useForm<ProfileFormValues>({
+const generateNextName = (currentName: string) => {
+  const match = currentName.match(/(.*)-(\d+)$/);
+  if (match) {
+    const base = match[1];
+    const num = parseInt(match[2], 10) + 1;
+    return `${base}-${num}`;
+  }
+  return `${currentName}-1`;
+};
+
+export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, initialProfile, onProfileSaved }) => {
+  const { register, control, handleSubmit, setValue, getValues, formState: { errors } } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
+    defaultValues: initialProfile ? {
+      name: generateNextName(initialProfile.name),
+      insulinType: initialProfile.insulinType || 'Humalog',
+      durationOfAction: initialProfile.durationOfAction || 300,
+      basal: initialProfile.basal?.length ? initialProfile.basal : [{ startTime: '00:00', value: 0.5 }],
+      icr: initialProfile.icr || [],
+      isf: initialProfile.isf || [],
+    } : {
       name: '',
       insulinType: 'Humalog',
-      durationOfAction: 360,
+      durationOfAction: 300,
       basal: [{ startTime: '00:00', value: 0.5 }],
       icr: [],
       isf: [],
     },
   });
+
+  const { is24Hour } = useTimeFormat();
+
+  const { data: insulins = [] } = useQuery({
+    queryKey: ['insulins'],
+    queryFn: () => api.getInsulins().then(res => res.data)
+  });
+
+  const { data: allProfiles = [] } = useQuery({
+    queryKey: ['profiles', userId],
+    queryFn: () => api.listProfiles(userId).then(res => res.data),
+    enabled: !!initialProfile
+  });
+
   
   const { fields: basalFields, append: appendBasal, remove: removeBasal } = useFieldArray({
     control,
@@ -91,11 +139,17 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, onProfileS
     name: "isf"
   });
 
+  const [activeTab, setActiveTab] = useState<'basal' | 'icr' | 'isf'>('basal');
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isAddingNewInsulin, setIsAddingNewInsulin] = useState(false);
 
   const onSubmit = async (data: ProfileFormValues) => {
     setApiError(null);
     try {
+      if (data.insulinType && !insulins.find(i => i.name === data.insulinType)) {
+        await api.createInsulin({ name: data.insulinType });
+      }
+
       // Map form data to API request
       // Note: The generated CreateProfileRequest interface might be strict.
       // We are casting for MVP simplicity, connecting real fields.
@@ -109,7 +163,11 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, onProfileS
         targets: []
       };
       
-      await api.createProfile(userId, request);
+      if (initialProfile?.id) {
+        await api.updateProfile(userId, initialProfile.id, { ...initialProfile, ...request } as Profile);
+      } else {
+        await api.createProfile(userId, request);
+      }
       onProfileSaved?.();
     } catch (err: any) {
       console.error(err);
@@ -119,7 +177,25 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, onProfileS
 
   return (
     <div className="profile-editor">
-      <h3>Create Profile</h3>
+      <h3>{initialProfile ? 'Edit Profile' : 'Create Profile'}</h3>
+      
+      {initialProfile && (
+        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+          <div style={{ marginBottom: '4px' }}>
+            <strong>Activation Date:</strong> {initialProfile.createdAt ? new Date(initialProfile.createdAt).toLocaleString(navigator.language, { dateStyle: 'short', timeStyle: 'short', hour12: !is24Hour }) : 'N/A'}
+          </div>
+          {initialProfile.status === 'ARCHIVED' && (
+            <div>
+              <strong>Deactivation Date:</strong> {(() => {
+                const nextP = allProfiles.find(p => p.previousProfileId === initialProfile.id && (p.status === 'ACTIVE' || p.status === 'ARCHIVED'));
+                return nextP?.createdAt ? new Date(nextP.createdAt).toLocaleString(navigator.language, { dateStyle: 'short', timeStyle: 'short', hour12: !is24Hour }) : 'N/A';
+              })()}
+            </div>
+          )}
+          {initialProfile.status === 'ACTIVE' && <div style={{ color: 'var(--accent-success)', marginTop: '4px' }}>Currently Active Configuration</div>}
+        </div>
+      )}
+
       {apiError && <div className="error">{apiError}</div>}
       <form onSubmit={handleSubmit(onSubmit)}>
         <div>
@@ -130,7 +206,62 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, onProfileS
 
         <div>
            <label htmlFor="insulinType">Insulin Type</label>
-           <input id="insulinType" {...register("insulinType")} />
+           {!isAddingNewInsulin ? (
+             <div style={{ display: 'flex', gap: '8px' }}>
+               <select 
+                 id="insulinType" 
+                 {...(() => {
+                   const { onChange, ...rest } = register("insulinType");
+                   return {
+                     ...rest,
+                     onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+                       if (e.target.value === '___ADD_NEW___') {
+                         setIsAddingNewInsulin(true);
+                         setValue('insulinType', '');
+                       } else {
+                         onChange(e);
+                       }
+                     }
+                   };
+                 })()}
+                 style={{ 
+                   padding: '8px', 
+                   maxWidth: '300px', 
+                   flex: '0 1 auto', 
+                   borderRadius: '4px', 
+                   border: '1px solid var(--border-color)',
+                   backgroundColor: 'var(--surface-color)',
+                   color: 'var(--text-primary)'
+                 }}
+               >
+                 <option value="">-- Select Insulin --</option>
+                 {insulins.map((insulin) => (
+                   <option key={insulin.id} value={insulin.name}>{insulin.name}</option>
+                 ))}
+                 <option value="___ADD_NEW___">+ Add New...</option>
+               </select>
+             </div>
+           ) : (
+             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+               <input 
+                 id="insulinType" 
+                 {...register("insulinType")} 
+                 placeholder="Enter new insulin name" 
+                 autoFocus 
+                 style={{ flex: 1 }}
+               />
+               <button 
+                 type="button" 
+                 onClick={() => { 
+                   setIsAddingNewInsulin(false); 
+                   setValue('insulinType', insulins[0]?.name || ''); 
+                 }}
+                 style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+               >
+                 Cancel
+               </button>
+             </div>
+           )}
            {errors.insulinType && <span>{errors.insulinType.message}</span>}
         </div>
 
@@ -140,77 +271,104 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, onProfileS
            {errors.durationOfAction && <span>{errors.durationOfAction.message}</span>}
         </div>
 
-        <h4>Basal Schedule</h4>
-        {basalFields.map((field, index) => (
-          <div key={field.id} className="segment-row">
-            <input 
-                type="time"
-                {...register(`basal.${index}.startTime` as const)} 
-                placeholder="00:00"
-                aria-label={`Start Time ${index}`}
-            />
-            <input 
-                type="number" 
-                step="0.05"
-                {...register(`basal.${index}.value` as const, { valueAsNumber: true })} 
-                placeholder="Rate (U/hr)"
-                aria-label={`Value ${index}`}
-            />
-            <button type="button" onClick={() => removeBasal(index)}>Remove</button>
-            {errors.basal?.[index]?.startTime && <span>Start Time Error</span>}
-            {errors.basal?.[index]?.value && <span>Value Error</span>}
-          </div>
-        ))}
-        <button type="button" onClick={() => appendBasal({ startTime: "", value: 0 })}>Add Segment</button>
-        {errors.basal && <div className="error-text">{errors.basal.message}</div>}
+        <div className="tabs" style={{ display: 'flex', gap: '10px', marginTop: '20px', marginBottom: '15px', borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
+          <button type="button" style={{ fontWeight: activeTab === 'basal' ? 'bold' : 'normal', backgroundColor: activeTab === 'basal' ? '#e0e0e0' : 'transparent', color: '#333' }} onClick={() => setActiveTab('basal')}>Basal</button>
+          <button type="button" style={{ fontWeight: activeTab === 'icr' ? 'bold' : 'normal', backgroundColor: activeTab === 'icr' ? '#e0e0e0' : 'transparent', color: '#333' }} onClick={() => setActiveTab('icr')}>ICR</button>
+          <button type="button" style={{ fontWeight: activeTab === 'isf' ? 'bold' : 'normal', backgroundColor: activeTab === 'isf' ? '#e0e0e0' : 'transparent', color: '#333' }} onClick={() => setActiveTab('isf')}>ISF</button>
+        </div>
 
-        <h4>Insulin to Carb Ratio (ICR)</h4>
-        {icrFields.map((field, index) => (
-          <div key={field.id} className="segment-row">
-            <input 
-                type="time"
-                {...register(`icr.${index}.startTime` as const)} 
-                placeholder="00:00"
-                aria-label={`ICR Start Time ${index}`}
-            />
-            <input 
-                type="number" 
-                step="0.1"
-                {...register(`icr.${index}.value` as const, { valueAsNumber: true })} 
-                placeholder="Ratio (g/U)"
-                aria-label={`ICR Value ${index}`}
-            />
-            <button type="button" onClick={() => removeIcr(index)}>Remove</button>
-            {errors.icr?.[index]?.startTime && <span>Start Time Error</span>}
-            {errors.icr?.[index]?.value && <span>{errors.icr[index]?.value?.message || "Value Error"}</span>}
+        {activeTab === 'basal' && (
+          <div className="tab-content">
+            <h4>Basal Schedule</h4>
+            {basalFields.map((field, index) => (
+              <div key={field.id} className="segment-row">
+                <Controller
+                  control={control}
+                  name={`basal.${index}.startTime` as const}
+                  render={({ field }) => (
+                    <TimeInput 
+                        {...field}
+                    />
+                  )}
+                />
+                <input 
+                    type="number" 
+                    step="0.05"
+                    {...register(`basal.${index}.value` as const, { valueAsNumber: true })} 
+                    placeholder="Rate (U/hr)"
+                    aria-label={`Value ${index}`}
+                />
+                <button type="button" onClick={() => removeBasal(index)}>Remove</button>
+                {errors.basal?.[index]?.startTime && <span>Start Time Error</span>}
+                {errors.basal?.[index]?.value && <span>Value Error</span>}
+              </div>
+            ))}
+            <button type="button" onClick={() => appendBasal(getNextSegment(getValues('basal') || basalFields, 0.5))}>Add Segment</button>
+            {errors.basal && <div className="error-text">{errors.basal.message}</div>}
           </div>
-        ))}
-        <button type="button" onClick={() => appendIcr({ startTime: "", value: 10.0 })}>Add ICR Segment</button>
-        {errors.icr && <div className="error-text">{errors.icr.message}</div>}
+        )}
 
-        <h4>Insulin Sensitivity Factor (ISF)</h4>
-        {isfFields.map((field, index) => (
-          <div key={field.id} className="segment-row">
-            <input 
-                type="time"
-                {...register(`isf.${index}.startTime` as const)} 
-                placeholder="00:00"
-                aria-label={`ISF Start Time ${index}`}
-            />
-            <input 
-                type="number" 
-                step="1"
-                {...register(`isf.${index}.value` as const, { valueAsNumber: true })} 
-                placeholder="Factor (mg/dL)"
-                aria-label={`ISF Value ${index}`}
-            />
-            <button type="button" onClick={() => removeIsf(index)}>Remove</button>
-            {errors.isf?.[index]?.startTime && <span>Start Time Error</span>}
-            {errors.isf?.[index]?.value && <span>{errors.isf[index]?.value?.message || "Value Error"}</span>}
+        {activeTab === 'icr' && (
+          <div className="tab-content">
+            <h4>Insulin to Carb Ratio (ICR)</h4>
+            {icrFields.map((field, index) => (
+              <div key={field.id} className="segment-row">
+                <Controller
+                  control={control}
+                  name={`icr.${index}.startTime` as const}
+                  render={({ field }) => (
+                    <TimeInput 
+                        {...field}
+                    />
+                  )}
+                />
+                <input 
+                    type="number" 
+                    step="0.1"
+                    {...register(`icr.${index}.value` as const, { valueAsNumber: true })} 
+                    placeholder="Ratio (g/U)"
+                    aria-label={`ICR Value ${index}`}
+                />
+                <button type="button" onClick={() => removeIcr(index)}>Remove</button>
+                {errors.icr?.[index]?.startTime && <span>Start Time Error</span>}
+                {errors.icr?.[index]?.value && <span>{errors.icr[index]?.value?.message || "Value Error"}</span>}
+              </div>
+            ))}
+            <button type="button" onClick={() => appendIcr(getNextSegment(getValues('icr') || icrFields, 10.0))}>Add ICR Segment</button>
+            {errors.icr && <div className="error-text">{errors.icr.message}</div>}
           </div>
-        ))}
-        <button type="button" onClick={() => appendIsf({ startTime: "", value: 50.0 })}>Add ISF Segment</button>
-        {errors.isf && <div className="error-text">{errors.isf.message}</div>}
+        )}
+
+        {activeTab === 'isf' && (
+          <div className="tab-content">
+            <h4>Insulin Sensitivity Factor (ISF)</h4>
+            {isfFields.map((field, index) => (
+              <div key={field.id} className="segment-row">
+                <Controller
+                  control={control}
+                  name={`isf.${index}.startTime` as const}
+                  render={({ field }) => (
+                    <TimeInput 
+                        {...field}
+                    />
+                  )}
+                />
+                <input 
+                    type="number" 
+                    step="1"
+                    {...register(`isf.${index}.value` as const, { valueAsNumber: true })} 
+                    placeholder="Factor (mg/dL)"
+                    aria-label={`ISF Value ${index}`}
+                />
+                <button type="button" onClick={() => removeIsf(index)}>Remove</button>
+                {errors.isf?.[index]?.startTime && <span>Start Time Error</span>}
+                {errors.isf?.[index]?.value && <span>{errors.isf[index]?.value?.message || "Value Error"}</span>}
+              </div>
+            ))}
+            <button type="button" onClick={() => appendIsf(getNextSegment(getValues('isf') || isfFields, 50.0))}>Add ISF Segment</button>
+            {errors.isf && <div className="error-text">{errors.isf.message}</div>}
+          </div>
+        )}
 
         <div style={{ marginTop: '20px' }}>
             <button type="submit">Save Profile</button>

@@ -17,3 +17,11 @@
 ** **Standard**: JWT is the industry standard for stateless authentication in microservices.
 ** **Interoperability**: Easily integrates with Identity Providers (Keycloak, Auth0, etc.).
 ** **Stateless**: No session state required on the server.
+
+* **Addendum (OpenID Connect & JWKS)**:
+** **Decision**: Migrate from symmetric `HMAC256` token validation to asymmetric `RS256` using Keycloak's JSON Web Key Set (JWKS).
+** **Details**: The backend now dynamically fetches the Identity Provider's public keys via a URL (e.g., `http://keycloak:8080/realms/kdiab-profiles/protocol/openid-connect/certs`).
+** **Rationale**:
+*** Allows Keycloak to rotate keys securely without backend downtime.
+*** Prevents the need to hardcode shared symmetric secrets `jwt.secret` across environments.
+*** Standardized approach for verifying third-party OAuth 2.0 / OIDC provider signatures.

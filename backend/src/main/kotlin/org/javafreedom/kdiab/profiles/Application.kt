@@ -9,9 +9,11 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import org.javafreedom.kdiab.profiles.adapters.inbound.web.profileRoutes
+import org.javafreedom.kdiab.profiles.adapters.inbound.web.insulinRoutes
 import org.javafreedom.kdiab.profiles.application.service.ProfileService
 import org.javafreedom.kdiab.profiles.infrastructure.persistence.DatabaseFactory
 import org.javafreedom.kdiab.profiles.infrastructure.persistence.PostgresProfileRepository
+import org.javafreedom.kdiab.profiles.infrastructure.persistence.ExposedInsulinRepository
 import org.javafreedom.kdiab.profiles.plugins.configureSecurity
 import org.javafreedom.kdiab.profiles.plugins.configureStatusPages
 import org.javafreedom.kdiab.profiles.plugins.configureLogging
@@ -49,6 +51,7 @@ fun Application.module(
         route("/api/v1") {
             profileRoutes(profileService)
         }
+        insulinRoutes(ExposedInsulinRepository())
 
         swaggerUI(path = "swagger", swaggerFile = "openapi.yaml")
     }

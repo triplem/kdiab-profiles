@@ -13,6 +13,9 @@ vi.mock('../api/client', () => ({
   },
 }));
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TimeFormatProvider } from '../context/TimeFormatContext';
+
 test('renders profile history', async () => {
   const mockHistory: Profile[] = [
     {
@@ -28,7 +31,14 @@ test('renders profile history', async () => {
 
   (api.getProfileHistory as Mock).mockResolvedValue({ data: mockHistory });
 
-  render(<ProfileHistory userId="user-1" />);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <TimeFormatProvider>
+        <ProfileHistory userId="user-1" />
+      </TimeFormatProvider>
+    </QueryClientProvider>
+  );
 
   expect(screen.getByText(/loading history/i)).toBeInTheDocument();
 
@@ -41,7 +51,14 @@ test('renders profile history', async () => {
 test('refetches history when dates change', async () => {
   (api.getProfileHistory as Mock).mockResolvedValue({ data: [] });
 
-  render(<ProfileHistory userId="user-1" />);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <TimeFormatProvider>
+        <ProfileHistory userId="user-1" />
+      </TimeFormatProvider>
+    </QueryClientProvider>
+  );
 
   // Wait for initial load
   await waitFor(() => {

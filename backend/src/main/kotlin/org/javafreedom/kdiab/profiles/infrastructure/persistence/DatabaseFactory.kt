@@ -7,6 +7,7 @@ import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.transactions.*
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.*
+import kotlin.uuid.Uuid
 
 object DatabaseFactory {
     fun init(config: ApplicationConfig) {
@@ -33,6 +34,18 @@ object DatabaseFactory {
         val dataSource = HikariDataSource(hikariConfig)
         Database.connect(dataSource)
 
-        transaction { SchemaUtils.create(Profiles) }
+        transaction { 
+            SchemaUtils.create(Profiles, Insulins) 
+            
+            if (Insulins.selectAll().count() == 0L) {
+                val defaultInsulins = listOf("Humalog", "Fiasp", "Liumjev")
+                defaultInsulins.forEach { insulinName ->
+                    Insulins.insert {
+                        it[id] = Uuid.random()
+                        it[name] = insulinName
+                    }
+                }
+            }
+        }
     }
 }

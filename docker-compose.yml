@@ -36,8 +36,9 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: kdiab-profiles
       JDBC_URL: jdbc:postgresql://postgres:5432/kdiab-profiles
-      JWT_DOMAIN: http://keycloak:8080/realms/kdiab-profiles
-      JWT_AUDIENCE: account
+      JWT_DOMAIN: http://localhost:8081/realms/kdiab-profiles
+      JWKS_URL: http://keycloak:8080/realms/kdiab-profiles/protocol/openid-connect/certs
+      JWT_AUDIENCE: profile
       JWT_REALM: kdiab-profiles
     ports:
       - "8080:8080"
@@ -49,8 +50,8 @@ services:
 
   frontend:
     build:
-      context: frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
       - "3000:8080"
     depends_on:

@@ -7,7 +7,7 @@ This document defines specific "Agent Personas" that should be adopted by AI ass
 * **Goal**: Ensure code reliability and correct behavior through comprehensive testing.
 * **Responsibilities**:
 ** Writing **Unit Tests** for domain logic (JUnit 5, Mockk).
-** Implementing **Integration Tests** for API endpoints and Database adapters (Testcontainers).
+** Implementing **Integration Tests** for API endpoints and Database adapters.
 ** Identifying edge cases and boundary conditions.
 ** Analyzing test coverage reports (JaCoCo) and closing gaps.
 * **Key Prompts**: "Act as the QA Agent and write tests for this new feature.", "Analyze the coverage report and suggest missing test cases."

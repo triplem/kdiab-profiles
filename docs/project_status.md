@@ -57,9 +57,9 @@
     - [x] Remove Users object from Tables.kt <!-- id: 31 -->
     - [x] Update Profiles table definition <!-- id: 32 -->
     - [x] Add ADR-003 <!-- id: 33 -->
-- [/] **Frontend Application (React/TS)** <!-- id: 19 -->
-    - [/] Setup Vite + React + TypeScript <!-- id: 20 -->
-    - [ ] Implement Profile Management UI <!-- id: 21 -->
+- [x] **Frontend Application (React/TS)** <!-- id: 19 -->
+    - [x] Setup Vite + React + TypeScript <!-- id: 20 -->
+    - [x] Implement Profile Management UI (Viewing, Expanding, and Editing) <!-- id: 21 -->
 - [x] **Verification & Deployment** <!-- id: 23 -->
     - [x] Dockerize Application (Dockerfile) <!-- id: 24 -->
     - [x] Comprehensive Testing (Unit/Integration) <!-- id: 25 -->
@@ -138,3 +138,8 @@
 - [x] **Maintenance & Optimization** <!-- id: 150 -->
     - [x] Refactor Gradle Build & Dependencies <!-- id: 151 -->
     - [x] Standardize Experimental Opt-ins (Global) <!-- id: 152 -->
+
+- [/] **Insulin Management Feature** <!-- id: 160 -->
+    - [x] Backend Domain and Persistence (ExposedInsulinRepository) <!-- id: 161 -->
+    - [x] Backend API Routes (InsulinRoutes) and E2E Tests <!-- id: 162 -->
+    - [/] Frontend Integration (TimeInput, ProfileEditor integration) <!-- id: 163 -->

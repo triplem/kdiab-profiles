@@ -106,7 +106,10 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                                         createdAt = kotlin.time.Clock.System.now(),
                                         previousProfileId = existing.id
                                 )
-                        logger.debug { "Copy-on-write UPDATE: Archived ${existing.id}, created new active ${newVersion.id}" }
+                        logger.debug { 
+                                "Copy-on-write UPDATE: Archived ${existing.id}, " + 
+                                "created new active ${newVersion.id}" 
+                        }
                         return profileRepository.updateActiveProfile(archived, newVersion)
                 }
 

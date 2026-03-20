@@ -6,13 +6,102 @@ import { useTimeFormat } from '../context/TimeFormatContext';
 
 interface ProfileHistoryProps {
   userId: string;
+  onSelectProfile?: (profile: Profile) => void;
 }
 
-export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId }) => {
+const ProfileHistoryItem = ({ profile, formatTime, is24Hour, onSelectProfile }: { profile: Profile, formatTime: (t: string) => string, is24Hour: boolean, onSelectProfile?: (p: Profile) => void }) => {
+  const [activeTab, setActiveTab] = useState<'basal' | 'icr' | 'isf'>('basal');
+
+  return (
+    <li className="history-item">
+      <details>
+        <summary>
+          <strong>{profile.name}</strong> - <span className={`status-badge status-${(profile.status as string || 'Unknown').toLowerCase()}`}>{profile.status as string || 'Unknown'}</span>
+          <span className="date">({profile.createdAt ? new Date(profile.createdAt).toLocaleString(navigator.language, { dateStyle: 'short', timeStyle: 'short', hour12: !is24Hour }) : 'N/A'})</span>
+          {onSelectProfile && (
+            <button 
+              type="button" 
+              className="btn outline"
+              style={{ padding: '0.1rem 0.4rem', fontSize: '0.8rem', marginLeft: '0.5rem' }}
+              onClick={(e) => { e.preventDefault(); onSelectProfile(profile); }}
+            >
+              Edit
+            </button>
+          )}
+        </summary>
+        <div className="history-details">
+          <p>Insulin: {profile.insulinType || 'N/A'} • Action: {profile.durationOfAction || 0}m</p>
+
+          <div className="history-tabs" style={{ display: 'flex', gap: '8px', marginTop: '12px', marginBottom: '8px', borderBottom: '1px solid #ccc', paddingBottom: '6px' }}>
+            <button 
+              type="button" 
+              style={{ fontWeight: activeTab === 'basal' ? 'bold' : 'normal', border: 'none', background: 'none', cursor: 'pointer', textDecoration: activeTab === 'basal' ? 'underline' : 'none' }} 
+              onClick={() => setActiveTab('basal')}
+            >
+              Basal ({profile.basal?.length || 0})
+            </button>
+            <button 
+              type="button" 
+              style={{ fontWeight: activeTab === 'icr' ? 'bold' : 'normal', border: 'none', background: 'none', cursor: 'pointer', textDecoration: activeTab === 'icr' ? 'underline' : 'none' }} 
+              onClick={() => setActiveTab('icr')}
+            >
+              ICR ({profile.icr?.length || 0})
+            </button>
+            <button 
+              type="button" 
+              style={{ fontWeight: activeTab === 'isf' ? 'bold' : 'normal', border: 'none', background: 'none', cursor: 'pointer', textDecoration: activeTab === 'isf' ? 'underline' : 'none' }} 
+              onClick={() => setActiveTab('isf')}
+            >
+              ISF ({profile.isf?.length || 0})
+            </button>
+          </div>
+
+          <div className="tab-contents" style={{ padding: '4px 0' }}>
+            {activeTab === 'basal' && (
+              <div>
+                {profile.basal && profile.basal.length > 0 ? (
+                  <ul>
+                    {profile.basal.map((b, i) => (
+                      <li key={i}>{formatTime(b?.startTime || '00:00')} - {b?.value} U/hr</li>
+                    ))}
+                  </ul>
+                ) : <p>No Basal segments.</p>}
+              </div>
+            )}
+            {activeTab === 'icr' && (
+              <div>
+                {profile.icr && profile.icr.length > 0 ? (
+                  <ul>
+                    {profile.icr.map((icr, i) => (
+                      <li key={i}>{formatTime(icr?.startTime || '00:00')} - {icr?.value} g/U</li>
+                    ))}
+                  </ul>
+                ) : <p>No ICR segments.</p>}
+              </div>
+            )}
+            {activeTab === 'isf' && (
+              <div>
+                {profile.isf && profile.isf.length > 0 ? (
+                  <ul>
+                    {profile.isf.map((isf, i) => (
+                      <li key={i}>{formatTime(isf?.startTime || '00:00')} - {isf?.value} mg/dL</li>
+                    ))}
+                  </ul>
+                ) : <p>No ISF segments.</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      </details>
+    </li>
+  );
+};
+
+export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelectProfile }) => {
   const [history, setHistory] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { formatTime } = useTimeFormat();
+  const { formatTime, is24Hour } = useTimeFormat();
   
   // Default to last 30 days, properly formatted as 'YYYY-MM-DD'
   const [startDate, setStartDate] = useState(() => {
@@ -36,12 +125,25 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId }) => {
         const fromDate = startOfDay(parsedStart);
         const toDate = endOfDay(parsedEnd);
 
-        const response = await api.getProfileHistory(
+        const historyRes = await api.getProfileHistory(
           userId,
           fromDate.toISOString(),
           toDate.toISOString()
         );
-        setHistory(response.data);
+        
+        try {
+          const profilesRes = await api.listProfiles(userId);
+          const activeProfile = profilesRes.data.find(p => p.status === 'ACTIVE');
+          
+          if (activeProfile && !historyRes.data.find(p => p.id === activeProfile.id)) {
+            setHistory([activeProfile, ...historyRes.data]);
+          } else {
+            setHistory(historyRes.data);
+          }
+        } catch (e) {
+          // Fallback if listProfiles fails
+          setHistory(historyRes.data);
+        }
       } catch (err) {
         console.error(err);
         setError('Failed to fetch history');
@@ -88,35 +190,7 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId }) => {
       ) : (
         <ul className="history-list">
           {history.map(profile => (
-            <li key={profile.id} className="history-item">
-              <details>
-                <summary>
-                  <strong>{profile.name}</strong> - <span className={`status-badge status-${profile.status.toLowerCase()}`}>{profile.status}</span>
-                  <span className="date">({profile.createdAt ? new Date(profile.createdAt).toLocaleString() : 'N/A'})</span>
-                </summary>
-                <div className="history-details">
-                  <p>Insulin: {profile.insulinType} • Action: {profile.durationOfAction}m</p>
-                  <p style={{ marginTop: '0.5rem', fontWeight: 500 }}>Basal Segments ({profile.basal?.length || 0}):</p>
-                  <ul>
-                    {profile.basal?.map((b, i) => (
-                      <li key={i}>{formatTime(b.startTime)} - {b.value} U/hr</li>
-                    ))}
-                  </ul>
-                  {profile.icr && profile.icr.length > 0 && (
-                     <>
-                        <p style={{ marginTop: '0.5rem', fontWeight: 500 }}>ICR Segments ({profile.icr.length}):</p>
-                        <ul>{profile.icr.map((icr, i) => <li key={i}>{formatTime(icr.startTime)} - {icr.value} g/U</li>)}</ul>
-                     </>
-                  )}
-                  {profile.isf && profile.isf.length > 0 && (
-                     <>
-                        <p style={{ marginTop: '0.5rem', fontWeight: 500 }}>ISF Segments ({profile.isf.length}):</p>
-                        <ul>{profile.isf.map((isf, i) => <li key={i}>{formatTime(isf.startTime)} - {isf.value} mg/dL</li>)}</ul>
-                     </>
-                  )}
-                </div>
-              </details>
-            </li>
+            <ProfileHistoryItem key={profile.id} profile={profile} formatTime={formatTime} is24Hour={is24Hour} onSelectProfile={onSelectProfile} />
           ))}
         </ul>
       )}
