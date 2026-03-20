@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM gradle:9.3.1-jdk21 AS build
+FROM gradle:9.4.1-jdk21 AS build
 WORKDIR /app
 
 # Cache dependencies first
