@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import App from './App';
+import App from '../App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TimeFormatProvider } from './context/TimeFormatContext';
+import { TimeFormatProvider } from '../context/TimeFormatContext';
 import { vi, test, expect } from 'vitest';
-import { api } from './api/client';
+import { api } from '../api/client';
 
 vi.mock('react-oidc-context', () => ({
   useAuth: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock('react-oidc-context', () => ({
 import { useAuth } from 'react-oidc-context';
 
 // Mock the API client globally for this test file
-vi.mock('./api/client', () => ({
+vi.mock('../api/client', () => ({
   api: {
     listProfiles: vi.fn(),
     createProfile: vi.fn(),

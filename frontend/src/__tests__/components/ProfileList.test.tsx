@@ -1,11 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { ProfileList } from './ProfileList';
-import { api } from '../api/client';
-import { Profile, ProfileStatusEnum } from '../api/generated';
+import { ProfileList } from '../../components/ProfileList';
+import { api } from '../../api/client';
+import { Profile, ProfileStatusEnum } from '../../api/generated';
 import { vi, test, expect, Mock } from 'vitest';
 
 // Mock the API client
-vi.mock('../api/client', () => ({
+vi.mock('../../api/client', () => ({
   api: {
     listProfiles: vi.fn(),
     activateProfile: vi.fn(),

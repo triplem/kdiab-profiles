@@ -1,11 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { AdminInsulinManager } from './AdminInsulinManager';
-import { api } from '../api/client';
+import { AdminInsulinManager } from '../../components/AdminInsulinManager';
+import { api } from '../../api/client';
 import { vi, test, expect, Mock } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-vi.mock('../api/client', () => ({
+vi.mock('../../api/client', () => ({
   api: {
     getInsulins: vi.fn(),
     createInsulin: vi.fn(),

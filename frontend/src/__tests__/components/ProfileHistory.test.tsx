@@ -1,20 +1,20 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { ProfileHistory } from './ProfileHistory';
-import { api } from '../api/client';
-import type { Profile } from '../api/generated';
-import { ProfileStatusEnum } from '../api/generated';
+import { ProfileHistory } from '../../components/ProfileHistory';
+import { api } from '../../api/client';
+import type { Profile } from '../../api/generated';
+import { ProfileStatusEnum } from '../../api/generated';
 import { vi, test, expect } from 'vitest';
 import type { Mock } from 'vitest';
 
 // Mock the API client
-vi.mock('../api/client', () => ({
+vi.mock('../../api/client', () => ({
   api: {
     getProfileHistory: vi.fn(),
   },
 }));
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TimeFormatProvider } from '../context/TimeFormatContext';
+import { TimeFormatProvider } from '../../context/TimeFormatContext';
 
 test('renders profile history', async () => {
   const mockHistory: Profile[] = [

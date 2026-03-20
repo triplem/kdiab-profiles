@@ -1,13 +1,13 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ProfileEditor } from './ProfileEditor';
-import { api } from '../api/client';
+import { ProfileEditor } from '../../components/ProfileEditor';
+import { api } from '../../api/client';
 import { vi, test, expect, Mock } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TimeFormatProvider } from '../context/TimeFormatContext';
+import { TimeFormatProvider } from '../../context/TimeFormatContext';
 
 // Mock the API client
-vi.mock('../api/client', () => ({
+vi.mock('../../api/client', () => ({
   api: {
     createProfile: vi.fn(),
     getInsulins: vi.fn().mockResolvedValue({ data: [{ id: 'Fiasp', name: 'Fiasp' }] }),

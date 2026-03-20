@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    include: ['src/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
   },
   build: {
     sourcemap: true,
