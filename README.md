@@ -50,3 +50,5 @@ docker-compose down -v
 # Or with podman:
 # podman-compose down -v
 ```
+
+Additional information can be found in the ADRs.
