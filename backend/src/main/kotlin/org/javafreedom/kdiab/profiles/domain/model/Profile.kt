@@ -38,7 +38,24 @@ data class Profile(
     fun validate() {
         validatePhysics()
         validateBasalRequirements()
+        validateTimeSegments()
         validateUnitHeuristics()
+    }
+
+    private fun validateTimeSegments() {
+        val sortedIcr = icr.sortedBy { it.startTime }
+        if (sortedIcr.isNotEmpty() && sortedIcr.first().startTime != LocalTime(0, 0)) {
+            throw org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException(
+                "ICR profile must start at 00:00"
+            )
+        }
+
+        val sortedIsf = isf.sortedBy { it.startTime }
+        if (sortedIsf.isNotEmpty() && sortedIsf.first().startTime != LocalTime(0, 0)) {
+            throw org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException(
+                "ISF profile must start at 00:00"
+            )
+        }
     }
 
     private fun validatePhysics() {

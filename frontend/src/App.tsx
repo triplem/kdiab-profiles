@@ -4,7 +4,6 @@ import { ProfileList } from './components/ProfileList'
 import { ProfileEditor } from './components/ProfileEditor'
 import { ProfileHistory } from './components/ProfileHistory'
 import { AdminInsulinManager } from './components/AdminInsulinManager'
-import { useTimeFormat } from './context/TimeFormatContext'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Profile } from './api/generated'
 import React from 'react'
@@ -41,7 +40,6 @@ function App() {
   const [view, setView] = useState<'list' | 'create' | 'history' | 'edit' | 'admin'>('list')
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const { is24Hour, setIs24Hour } = useTimeFormat()
   const queryClient = useQueryClient()
 
   // Sync locale to Date Picker if Keycloak provides it
@@ -121,15 +119,7 @@ function App() {
           <span>Logged in as <strong>{auth.user?.profile.preferred_username || auth.user?.profile.name}</strong></span>
           <button style={{ marginLeft: '1rem', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }} onClick={() => void auth.signoutRedirect({ post_logout_redirect_uri: window.location.origin })}>Log out</button>
         </div>
-        <div style={{ marginLeft: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <label htmlFor="time-format-toggle" style={{ fontSize: '0.9rem' }}>24-hour time</label>
-          <input 
-            type="checkbox" 
-            id="time-format-toggle"
-            checked={is24Hour}
-            onChange={(e) => setIs24Hour(e.target.checked)}
-          />
-        </div>
+
         <div className="persona-badges">
           {/* Mock personas just for visual flair if needed */}
         </div>

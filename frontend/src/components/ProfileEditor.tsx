@@ -42,8 +42,16 @@ const profileSchema = z.object({
   insulinType: z.string().min(1, "Insulin type is required"),
   durationOfAction: z.number().min(1, "Duration must be positive (minutes)"),
   basal: z.array(timeSegmentSchema).nonempty("At least one basal segment required"),
-  icr: z.array(icrSegmentSchema),
-  isf: z.array(isfSegmentSchema)
+  icr: z.array(icrSegmentSchema).refine(arr => {
+    if (arr.length === 0) return true;
+    const sorted = [...arr].sort((a,b) => a.startTime.localeCompare(b.startTime));
+    return sorted[0].startTime === "00:00";
+  }, "ICR profile must start at 00:00"),
+  isf: z.array(isfSegmentSchema).refine(arr => {
+    if (arr.length === 0) return true;
+    const sorted = [...arr].sort((a,b) => a.startTime.localeCompare(b.startTime));
+    return sorted[0].startTime === "00:00";
+  }, "ISF profile must start at 00:00")
 }).refine((data) => {
   if (!data.basal || data.basal.length === 0) return true;
   let totalDailyBasal = 0;
@@ -171,7 +179,26 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, initialPro
       onProfileSaved?.();
     } catch (err: any) {
       console.error(err);
-      setApiError(err.message || "Failed to save profile");
+      let errorMessage = "Failed to save profile";
+      if (err.response?.data) {
+        if (typeof err.response.data === 'string') {
+          errorMessage = err.response.data;
+        } else if (err.response.data.message) {
+          errorMessage = err.response.data.message;
+        } else if (err.response.data.detail) {
+          errorMessage = err.response.data.detail;
+        } else if (typeof err.response.data === 'object') {
+          // Sometimes errors are wrapped or have different keys, stringify as a fallback
+          try {
+            errorMessage = JSON.stringify(err.response.data);
+          } catch (e) {
+             errorMessage = err.message;
+          }
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      setApiError(errorMessage);
     }
   };
 

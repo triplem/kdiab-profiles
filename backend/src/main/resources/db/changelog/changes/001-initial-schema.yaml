@@ -78,3 +78,24 @@ databaseChangeLog:
                   name: user_id
             unique: true
             where: status = 'ACTIVE'
+
+  - changeSet:
+      id: 3
+      author: javafreedom
+      changes:
+        - createTable:
+            tableName: insulins
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(254)
+                  constraints:
+                    nullable: false
+                    unique: true
+

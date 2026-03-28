@@ -36,16 +36,6 @@ object DatabaseFactory {
 
         transaction { 
             SchemaUtils.create(Profiles, Insulins) 
-            
-            if (Insulins.selectAll().count() == 0L) {
-                val defaultInsulins = listOf("Humalog", "Fiasp", "Liumjev")
-                defaultInsulins.forEach { insulinName ->
-                    Insulins.insert {
-                        it[id] = Uuid.random()
-                        it[name] = insulinName
-                    }
-                }
-            }
         }
     }
 }

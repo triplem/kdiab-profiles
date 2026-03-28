@@ -4,7 +4,7 @@ import com.auth0.jwk.JwkProviderBuilder
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.server.application.*
-import java.net.URL
+import java.net.URI
 import java.util.concurrent.TimeUnit
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -26,7 +26,7 @@ fun Application.configureSecurity() {
     val jwkProvider = if (!isTest) {
         val jwksUrl = environment.config.propertyOrNull("jwt.jwksUrl")?.getString() 
             ?: "$jwtDomain/protocol/openid-connect/certs"
-        JwkProviderBuilder(URL(jwksUrl))
+        JwkProviderBuilder(URI(jwksUrl).toUrl())
             .cached(JWK_CACHE_MAX_SIZE, JWK_CACHE_EXPIRES_IN, TimeUnit.HOURS)
             .rateLimited(JWK_RATE_LIMIT_BUCKET_SIZE, JWK_RATE_LIMIT_REFILL_RATE, TimeUnit.MINUTES)
             .build()
