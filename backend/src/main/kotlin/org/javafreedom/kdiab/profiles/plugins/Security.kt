@@ -57,7 +57,7 @@ fun Application.configureSecurity() {
                     val roles = rawRoles.mapNotNull { Role.fromString(it) }.toSet()
 
                     val allowedPatients =
-                            credential
+                           credential
                                     .payload
                                     .getClaim("allowed_patients")
                                     .asList(String::class.java)
