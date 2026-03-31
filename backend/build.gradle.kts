@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktor)
     alias(libs.plugins.openapi.generator)
-    alias(libs.plugins.sonarqube)
     alias(libs.plugins.detekt)
     alias(libs.plugins.kover)
     application
@@ -225,13 +224,7 @@ kover {
     }
 }
 
-sonarqube {
-    properties {
-        property("sonar.projectKey", "kdiab-profiles")
-        property("sonar.organization", "triplem")
-        property("sonar.host.url", "https://sonarcloud.io")
-    }
-}
+
 
 detekt {
     buildUponDefaultConfig = true // preconfigure defaults
