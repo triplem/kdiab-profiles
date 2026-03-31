@@ -1,12 +1,14 @@
 name: Semantic Release
 
 on:
-  push:
-    branches:
-      - '**'
+  workflow_run:
+    workflows: ["Backend CI"]
+    types:
+      - completed
 
 jobs:
   release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Semantic Release
     runs-on: ubuntu-latest
     timeout-minutes: 15

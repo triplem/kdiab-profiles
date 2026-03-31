@@ -1,8 +1,11 @@
 name: Deploy Documentation to GitHub Pages
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Backend CI"]
     branches: ["main"]
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -16,6 +19,7 @@ concurrency:
 
 jobs:
   build_docs:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
