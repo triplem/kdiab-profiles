@@ -227,7 +227,7 @@ kover {
 
 sonarqube {
     properties {
-        property("sonar.projectKey", "kdiab-profiles-backend")
+        property("sonar.projectKey", "kdiab-profiles")
         property("sonar.organization", "triplem")
         property("sonar.host.url", "https://sonarcloud.io")
     }
