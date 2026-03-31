@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.20-RC"
-ktor = "3.4.0"
+ktor = "3.4.2"
 openapi-generator = "7.20.0"
 sonarqube = "7.2.3.7755"
 detekt = "1.23.8"
