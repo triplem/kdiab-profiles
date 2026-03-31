@@ -67,7 +67,7 @@ class InsulinE2ETest :
                         val userId = Uuid.random()
                         val token = generateToken(userId)
 
-                        // 1. Fetch all - should have 3 defaults initially
+                        // 1. Fetch all - should be empty initially (seed data handled via Liquibase)
                         val getResponse = client.get("/api/v1/insulins") {
                             header(HttpHeaders.Authorization, "Bearer $token")
                         }
@@ -75,7 +75,7 @@ class InsulinE2ETest :
                         val emptyInsulins = getResponse.bodyAsText().let {
                             kotlinx.serialization.json.Json.decodeFromString<List<ApiInsulin>>(it)
                         }
-                        emptyInsulins.shouldHaveSize(3)
+                        emptyInsulins.shouldHaveSize(0)
 
                         // 2. Create Insulin
                         val createRequest = InsulinRequest(name = "NovoRapid")
@@ -93,7 +93,7 @@ class InsulinE2ETest :
                         createdInsulin.id.shouldNotBeBlank()
                         createdInsulin.name shouldBe "NovoRapid"
 
-                        // 3. Fetch all again - should have 4 items
+                        // 3. Fetch all again - should have 1 item
                         val getResponse2 = client.get("/api/v1/insulins") {
                             header(HttpHeaders.Authorization, "Bearer $token")
                         }
@@ -101,7 +101,7 @@ class InsulinE2ETest :
                         val insulinList = getResponse2.bodyAsText().let {
                             kotlinx.serialization.json.Json.decodeFromString<List<ApiInsulin>>(it)
                         }
-                        insulinList.shouldHaveSize(4)
+                        insulinList.shouldHaveSize(1)
                         insulinList.map { it.name }.contains("NovoRapid") shouldBe true
                     }
                 }

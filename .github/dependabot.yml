@@ -5,14 +5,51 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    groups:
+      major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+      minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
   - package-ecosystem: "docker"
     directory: "/backend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    groups:
+      major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+      minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
