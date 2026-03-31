@@ -26,6 +26,21 @@ services:
     ports:
       - "8081:8080"
 
+  liquibase:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.liquibase
+    command: >
+      --url=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-kdiab-profiles}
+      --username=${POSTGRES_USER:-postgres}
+      --password=${POSTGRES_PASSWORD:-password}
+      --searchPath=/liquibase
+      --changeLogFile=db/changelog/db.changelog-master.yaml
+      update
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
    # image: localhost/kdiab-backend:latest
     build:
@@ -47,6 +62,8 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_started
+      liquibase:
+        condition: service_completed_successfully
 
   frontend:
     build:
@@ -57,5 +74,18 @@ services:
     depends_on:
       - backend
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+
 volumes:
   postgres_data:
+  pgadmin_data:

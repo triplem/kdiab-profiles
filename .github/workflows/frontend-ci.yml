@@ -2,17 +2,27 @@ name: Frontend CI
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "**" ]
     paths:
       - 'frontend/**'
+      - 'api/openapi.yaml'
   pull_request:
-    branches: [ "main", "develop" ]
+    branches: [ "**" ]
     paths:
       - 'frontend/**'
+      - 'api/openapi.yaml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     defaults:
       run:

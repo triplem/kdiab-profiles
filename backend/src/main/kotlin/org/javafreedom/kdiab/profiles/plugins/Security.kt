@@ -26,7 +26,7 @@ fun Application.configureSecurity() {
     val jwkProvider = if (!isTest) {
         val jwksUrl = environment.config.propertyOrNull("jwt.jwksUrl")?.getString() 
             ?: "$jwtDomain/protocol/openid-connect/certs"
-        JwkProviderBuilder(URI(jwksUrl).toUrl())
+        JwkProviderBuilder(URI(jwksUrl).toURL())
             .cached(JWK_CACHE_MAX_SIZE, JWK_CACHE_EXPIRES_IN, TimeUnit.HOURS)
             .rateLimited(JWK_RATE_LIMIT_BUCKET_SIZE, JWK_RATE_LIMIT_REFILL_RATE, TimeUnit.MINUTES)
             .build()
