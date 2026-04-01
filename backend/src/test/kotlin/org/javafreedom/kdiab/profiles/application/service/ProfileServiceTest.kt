@@ -276,7 +276,10 @@ class ProfileServiceTest {
                 val profileId = Uuid.random()
                 val profile = Profile(
                         id = profileId, userId = userId, name = "Proposed", status = ProfileStatus.PROPOSED,
-                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList(),
                         insulinType = "Fiasp", durationOfAction = 180
                 )
 
@@ -288,7 +291,11 @@ class ProfileServiceTest {
 
                 assertEquals(ProfileStatus.ACTIVE, result.status)
                 assertEquals(profileId, result.id)
-                coVerify { repository.activateProfile(null, match { it.id == profileId && it.status == ProfileStatus.ACTIVE }) }
+                coVerify {
+                        repository.activateProfile(null, match {
+                                it.id == profileId && it.status == ProfileStatus.ACTIVE
+                        })
+                }
         }
 
         @Test
@@ -297,7 +304,10 @@ class ProfileServiceTest {
                 val profileId = Uuid.random()
                 val profile = Profile(
                         id = profileId, userId = userId, name = "Draft", status = ProfileStatus.DRAFT,
-                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList(),
                         insulinType = "Fiasp", durationOfAction = 180
                 )
                 coEvery { repository.findById(profileId) } returns profile
@@ -313,7 +323,10 @@ class ProfileServiceTest {
                 val profileId = Uuid.random()
                 val profile = Profile(
                         id = profileId, userId = userId, name = "Proposed", status = ProfileStatus.PROPOSED,
-                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList(),
                         insulinType = "Fiasp", durationOfAction = 180
                 )
 
@@ -332,7 +345,10 @@ class ProfileServiceTest {
                 val profileId = Uuid.random()
                 val profile = Profile(
                         id = profileId, userId = userId, name = "Draft", status = ProfileStatus.DRAFT,
-                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList(),
                         insulinType = "Fiasp", durationOfAction = 180
                 )
                 coEvery { repository.findById(profileId) } returns profile
@@ -494,7 +510,10 @@ class ProfileServiceTest {
         fun `updateProfile throws if archived`() = runBlocking {
                 val profile = Profile(
                         userId = Uuid.random(), name = "Archived", status = ProfileStatus.ARCHIVED,
-                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList(),
                         insulinType = "Fiasp", durationOfAction = 180
                 )
                 coEvery { repository.findById(profile.id) } returns profile
@@ -510,7 +529,10 @@ class ProfileServiceTest {
                 val profileId = Uuid.random()
                 val profile = Profile(
                         id = profileId, userId = userId, name = "Active", status = ProfileStatus.ACTIVE,
-                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList(),
                         insulinType = "Fiasp", durationOfAction = 180
                 )
                 coEvery { repository.findById(profileId) } returns profile
