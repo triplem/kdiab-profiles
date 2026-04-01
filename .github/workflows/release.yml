@@ -52,6 +52,11 @@ jobs:
           outputs: type=tar,dest=backend-image.tar
 
       - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          extra_plugins: |
+            @semantic-release/github
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release

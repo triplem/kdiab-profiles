@@ -220,6 +220,31 @@ class ProfileServiceTest {
                 }
         }
 
+	@Test
+	fun `activateProfile should clone archived profile when activated`() = runBlocking {
+                val userId = Uuid.random()
+                val archivedId = Uuid.random()
+                val archivedProfile = Profile(
+                        id = archivedId,
+                        userId = userId,
+                        name = "Archived",
+                        status = ProfileStatus.ARCHIVED,
+                        basal = emptyList(), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+
+                coEvery { repository.findById(archivedId) } returns archivedProfile
+                coEvery { repository.findActiveByUserId(userId) } returns null
+                coEvery { repository.activateProfile(any(), any()) } answers { secondArg() }
+
+                val result = service.activateProfile(userId, archivedId)
+
+                assertEquals(ProfileStatus.ACTIVE, result.status)
+                assert(result.id != archivedId)
+                assertEquals(archivedId, result.previousProfileId)
+                coVerify { repository.activateProfile(null, match { it.previousProfileId == archivedId }) }
+        }
+
         @Test
         fun `activateProfile returns immediately if already active`() = runBlocking {
                 val userId = Uuid.random()
@@ -242,7 +267,79 @@ class ProfileServiceTest {
 
                 val result = service.activateProfile(userId, profileId)
                 assertEquals(profile, result)
-                coVerify(exactly = 0) { repository.update(any()) }
+                coVerify(exactly = 0) { repository.activateProfile(any(), any()) }
+        }
+
+        @Test
+        fun `acceptProposedProfile happy path`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile = Profile(
+                        id = profileId, userId = userId, name = "Proposed", status = ProfileStatus.PROPOSED,
+                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+
+                coEvery { repository.findById(profileId) } returns profile
+                coEvery { repository.findActiveByUserId(userId) } returns null
+                coEvery { repository.activateProfile(any(), any()) } answers { secondArg() }
+
+                val result = service.acceptProposedProfile(userId, profileId)
+
+                assertEquals(ProfileStatus.ACTIVE, result.status)
+                assertEquals(profileId, result.id)
+                coVerify { repository.activateProfile(null, match { it.id == profileId && it.status == ProfileStatus.ACTIVE }) }
+        }
+
+        @Test
+        fun `acceptProposedProfile throws if not proposed`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile = Profile(
+                        id = profileId, userId = userId, name = "Draft", status = ProfileStatus.DRAFT,
+                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findById(profileId) } returns profile
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException> {
+                        service.acceptProposedProfile(userId, profileId)
+                }
+        }
+
+        @Test
+        fun `rejectProposedProfile happy path`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile = Profile(
+                        id = profileId, userId = userId, name = "Proposed", status = ProfileStatus.PROPOSED,
+                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+
+                coEvery { repository.findById(profileId) } returns profile
+                coEvery { repository.update(any()) } answers { firstArg() }
+
+                val result = service.rejectProposedProfile(userId, profileId)
+
+                assertEquals(ProfileStatus.ARCHIVED, result.status)
+                coVerify { repository.update(match { it.id == profileId && it.status == ProfileStatus.ARCHIVED }) }
+        }
+
+        @Test
+        fun `rejectProposedProfile throws if not proposed`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile = Profile(
+                        id = profileId, userId = userId, name = "Draft", status = ProfileStatus.DRAFT,
+                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findById(profileId) } returns profile
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException> {
+                        service.rejectProposedProfile(userId, profileId)
+                }
         }
 
         @Test
@@ -269,6 +366,22 @@ class ProfileServiceTest {
                 val result = service.deleteProfile(userId, profileId)
                 assert(result)
                 coVerify(exactly = 1) { repository.delete(profileId) }
+        }
+
+        @Test
+        fun `deleteProfile throws if active or archived`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile = Profile(
+                        id = profileId, userId = userId, name = "Active", status = ProfileStatus.ACTIVE,
+                        basal = emptyList(), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findById(profileId) } returns profile
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException> {
+                        service.deleteProfile(userId, profileId)
+                }
         }
 
         @Test
@@ -310,6 +423,52 @@ class ProfileServiceTest {
         }
 
         @Test
+        fun `deleteSegment logic works with copy-on-write for ACTIVE profile`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val time = LocalTime(0, 0)
+                val basal = listOf(BasalSegment(time, 1.0))
+                val profile =
+                        Profile(
+                                id = profileId,
+                                userId = userId,
+                                name = "Active",
+                                insulinType = "Fiasp",
+                                durationOfAction = 180,
+                                status = ProfileStatus.ACTIVE,
+                                basal = basal,
+                                icr = emptyList(),
+                                isf = emptyList(),
+                                targets = emptyList()
+                        )
+
+                coEvery { repository.findById(profileId) } returns profile
+                coEvery { repository.updateActiveProfile(any(), any()) } answers { secondArg() }
+
+                val result = service.deleteSegment(userId, profileId, "basal", time)
+                assert(result.basal.isEmpty())
+                assertEquals(ProfileStatus.ACTIVE, result.status)
+                assert(result.id != profileId)
+                coVerify { repository.updateActiveProfile(match { it.status == ProfileStatus.ARCHIVED }, any()) }
+        }
+
+        @Test
+        fun `deleteSegment throws if archived`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile = Profile(
+                        id = profileId, userId = userId, name = "Archived", status = ProfileStatus.ARCHIVED,
+                        basal = emptyList(), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findById(profileId) } returns profile
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException> {
+                        service.deleteSegment(userId, profileId, "basal", LocalTime(0, 0))
+                }
+        }
+
+        @Test
         fun `updateProfile delegates to repository`() = runBlocking {
                 val userId = Uuid.random()
                 val profile =
@@ -329,6 +488,41 @@ class ProfileServiceTest {
                 coEvery { repository.update(profile) } returns profile
                 val result = service.updateProfile(profile)
                 assertEquals(profile, result)
+        }
+
+        @Test
+        fun `updateProfile throws if archived`() = runBlocking {
+                val profile = Profile(
+                        userId = Uuid.random(), name = "Archived", status = ProfileStatus.ARCHIVED,
+                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findById(profile.id) } returns profile
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException> {
+                        service.updateProfile(profile)
+                }
+        }
+
+        @Test
+        fun `updateProfile copy-on-write if active`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile = Profile(
+                        id = profileId, userId = userId, name = "Active", status = ProfileStatus.ACTIVE,
+                        basal = listOf(BasalSegment(LocalTime(0,0), 1.0)), icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findById(profileId) } returns profile
+                coEvery { repository.updateActiveProfile(any(), any()) } answers { secondArg() }
+
+                val updated = profile.copy(name = "Updated Active")
+                val result = service.updateProfile(updated)
+
+                assertEquals("Updated Active", result.name)
+                assertEquals(ProfileStatus.ACTIVE, result.status)
+                assert(result.id != profileId)
+                coVerify { repository.updateActiveProfile(match { it.status == ProfileStatus.ARCHIVED }, any()) }
         }
 
         @Test
