@@ -39,6 +39,7 @@ dependencies {
     implementation(libs.kotlin.logging)
     implementation(libs.logback.classic)
 
+    implementation(libs.kotlinx.coroutines.core)
     // Database (Exposed + Postgres)
     implementation(libs.exposed.core)
     implementation(libs.exposed.jdbc)
@@ -231,6 +232,11 @@ detekt {
     allRules = false // activate all available (even unstable) rules.
     config.setFrom(files("$rootDir/config/detekt/detekt.yml")) // point to your custom config defining rules to run, overwriting default behavior
     baseline = file("$rootDir/config/detekt/baseline.xml") // a way of suppressing issues before introducing detekt
+    source.setFrom(files("src/main/kotlin"))
+}
+
+tasks.named<io.gitlab.arturbosch.detekt.Detekt>("detektMain") {
+    source = objects.fileCollection().from("src/main/kotlin").asFileTree
 }
 
 tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {

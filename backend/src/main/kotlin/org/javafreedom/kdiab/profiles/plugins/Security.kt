@@ -44,7 +44,8 @@ fun Application.configureSecurity() {
                         .build()
                 )
             } else {
-                verifier(jwkProvider!!, jwtDomain) {
+                val provider = checkNotNull(jwkProvider) { "JWK provider must be configured" }
+                verifier(provider, jwtDomain) {
                     acceptLeeway(JWT_ACCEPT_LEEWAY)
                 }
             }

@@ -13,35 +13,36 @@
 * **Containerization**: Docker / Docker Compose
 
 === AI Development Strategy
-We utilize specific **AI Agent Personas** to guide development. See link:ai-agents.adoc[AI Agent Personas] for details on roles like QA, Security, and DevOps agents.
+We utilize specific **AI Agent Personas** to guide development. See link:ai-agents.html[AI Agent Personas] for details on roles like QA, Security, and DevOps agents.
 
-=== Architecture Pattern
-We follow the **Hexagonal Architecture** (Ports and Adapters) pattern to isolate the core domain logic from external concerns.
+image::images/architecture.png[Architecture Diagram, align="center"]
 
-[mermaid]
-....
-graph TD
-    subgraph Core "Domain Core"
-        Entities[Entities: Profile, User]
-        UseCases[Use Cases: CreateProfile, ActivateProfile]
-    end
+== 2. Testing Strategy
+We employ a multi-layered testing strategy to ensure the reliability and correctness of the T1D Profile Service.
 
-    subgraph Ports "Ports (Interfaces)"
-        RepoPort[Repository Interface]
-        ApiPort[API Service Interface]
-    end
+=== 2.1 Unit Testing (Domain Logic)
+* **Goal**: Verify core business rules (e.g., profile activation, validation).
+* **Tools**: JUnit 5, Mockk.
+* **Scope**: Domain models and services, isolated from external dependencies.
 
-    subgraph Adapters "Adapters"
-        Ktor[Ktor REST API (Inbound)]
-        Postgres[PostgreSQL Adapter (Outbound)]
-    end
+=== 2.2 Integration Testing (Persistence & API)
+* **Goal**: Verify database interactions and API routing.
+* **Tools**: Ktor Test Host, H2 (In-memory) or Testcontainers (PostgreSQL).
+* **Scope**: Repositories, API controllers, and Liquibase migrations.
 
-    Ktor --> ApiPort
-    ApiPort --> UseCases
-    UseCases --> Entities
-    UseCases --> RepoPort
-    RepoPort <|.. Postgres
-....
+=== 2.3 End-to-End (E2E) Testing
+* **Goal**: Verify critical user flows (e.g., "Create and Activate Profile").
+* **Tools**: Kotest (BehaviorSpec DSL).
+* **ADR**: See link:adr/107-bdd-testing-with-kotest.html[ADR-107] for rationale.
+
+== 3. Authorization & Roles
+The system implements a role-based access control (RBAC) mechanism.
+
+* **PATIENT**: Full access to their own profiles.
+* **DOCTOR**: Read-only access to patient profiles (authorized via external service relationship).
+* **ADMIN**: Full read/write access to all system resources.
+
+The authorization is enforced in the **Domain Layer** (Use Cases) to ensure that even if the API layer is bypassed, business rules are still respected.
 
 == Code Structure & Standards
 

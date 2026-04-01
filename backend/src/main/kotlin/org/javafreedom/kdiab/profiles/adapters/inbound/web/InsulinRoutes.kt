@@ -31,8 +31,12 @@ fun Route.insulinRoutes(repository: InsulinRepository) {
 
             route("/{id}") {
                 put {
-                    val id = call.parameters["id"]?.let { Uuid.parse(it) } 
-                        ?: return@put call.respond(HttpStatusCode.BadRequest)
+                    val idString = call.parameters["id"]
+                    if (idString == null) {
+                        call.respond(HttpStatusCode.BadRequest)
+                        return@put
+                    }
+                    val id = Uuid.parse(idString)
                     val request = call.receive<InsulinRequest>()
                     val updated = repository.update(id, request.name)?.toApi()
                     if (updated != null) {
@@ -43,8 +47,12 @@ fun Route.insulinRoutes(repository: InsulinRepository) {
                 }
                 
                 delete {
-                    val id = call.parameters["id"]?.let { Uuid.parse(it) } 
-                        ?: return@delete call.respond(HttpStatusCode.BadRequest)
+                    val idString = call.parameters["id"]
+                    if (idString == null) {
+                        call.respond(HttpStatusCode.BadRequest)
+                        return@delete
+                    }
+                    val id = Uuid.parse(idString)
                     val deleted = repository.delete(id)
                     if (deleted) {
                         call.respond(HttpStatusCode.NoContent)

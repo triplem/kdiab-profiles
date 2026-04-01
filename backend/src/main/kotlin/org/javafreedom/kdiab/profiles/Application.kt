@@ -12,7 +12,7 @@ import org.javafreedom.kdiab.profiles.adapters.inbound.web.profileRoutes
 import org.javafreedom.kdiab.profiles.adapters.inbound.web.insulinRoutes
 import org.javafreedom.kdiab.profiles.application.service.ProfileService
 import org.javafreedom.kdiab.profiles.infrastructure.persistence.DatabaseFactory
-import org.javafreedom.kdiab.profiles.infrastructure.persistence.PostgresProfileRepository
+import org.javafreedom.kdiab.profiles.infrastructure.persistence.ExposedProfileRepository
 import org.javafreedom.kdiab.profiles.infrastructure.persistence.ExposedInsulinRepository
 import org.javafreedom.kdiab.profiles.plugins.configureSecurity
 import org.javafreedom.kdiab.profiles.plugins.configureStatusPages
@@ -23,7 +23,7 @@ import io.ktor.server.resources.Resources
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 fun Application.module(
-        profileService: ProfileService = ProfileService(PostgresProfileRepository()),
+        profileService: ProfileService = ProfileService(ExposedProfileRepository()),
         initDatabase: Boolean = true
 ) {
     configureLogging()

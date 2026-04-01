@@ -1,9 +1,10 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 package org.javafreedom.kdiab.profiles.adapters.inbound.web
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
-import kotlin.time.Clock
+import kotlinx.datetime.Clock
 import org.javafreedom.kdiab.profiles.api.models.CreateProfileRequest
 import org.javafreedom.kdiab.profiles.domain.model.Profile as DomainProfile
 import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus

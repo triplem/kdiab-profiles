@@ -1,7 +1,10 @@
-package org.javafreedom.kdiab.profiles.domain.port
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+package org.javafreedom.kdiab.profiles.domain.repository
 
 import kotlin.uuid.Uuid
+import kotlinx.datetime.Instant
 import org.javafreedom.kdiab.profiles.domain.model.Profile
+import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
 
 interface ProfileRepository {
     suspend fun save(profile: Profile): Profile
@@ -11,12 +14,15 @@ interface ProfileRepository {
     suspend fun update(profile: Profile): Profile
     suspend fun findHistory(
             userId: Uuid,
-            from: kotlin.time.Instant,
-            to: kotlin.time.Instant
+            from: Instant,
+            to: Instant
     ): List<Profile>
     suspend fun delete(id: Uuid): Boolean
     suspend fun deleteAllByUserId(userId: Uuid): Boolean
-    suspend fun deleteByUserIdAndStatus(userId: Uuid, status: org.javafreedom.kdiab.profiles.domain.model.ProfileStatus): Boolean
+    suspend fun deleteByUserIdAndStatus(
+        userId: Uuid,
+        status: ProfileStatus
+    ): Boolean
 
     // Atomic operations
     suspend fun updateActiveProfile(oldProfile: Profile, newProfile: Profile): Profile

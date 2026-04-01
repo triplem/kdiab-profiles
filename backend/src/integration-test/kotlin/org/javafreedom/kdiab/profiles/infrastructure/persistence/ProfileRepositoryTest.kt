@@ -5,45 +5,46 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalTime
-import org.javafreedom.kdiab.profiles.domain.model.BasalSegment
-import org.javafreedom.kdiab.profiles.domain.model.IcrSegment
-import org.javafreedom.kdiab.profiles.domain.model.IsfSegment
-import org.javafreedom.kdiab.profiles.domain.model.Profile
-import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
-import org.javafreedom.kdiab.profiles.domain.model.TargetSegment
+import org.javafreedom.kdiab.profiles.domain.model.*
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.statements.*
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.*
 
+@OptIn(ExperimentalUuidApi::class)
 class ProfileRepositoryTest {
 
-    private lateinit var repository: PostgresProfileRepository
+    private lateinit var repository: ExposedProfileRepository
 
     companion object {
         init {
             // Connect to H2 in-memory database with PostgreSQL compatibility
             Database.connect(
-                    url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
-                    driver = "org.h2.Driver",
-                    user = "root",
-                    password = ""
+                url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
+                driver = "org.h2.Driver",
+                user = "root",
+                password = ""
             )
         }
     }
 
     @BeforeTest
     fun setup() {
-        transaction { SchemaUtils.create(Profiles) }
-        repository = PostgresProfileRepository()
+        transaction {
+            SchemaUtils.create(Profiles)
+        }
+        repository = ExposedProfileRepository()
     }
 
     @AfterTest
     fun tearDown() {
-        transaction { SchemaUtils.drop(Profiles) }
+        transaction {
+            SchemaUtils.drop(Profiles)
+        }
     }
 
     @Test
@@ -103,20 +104,20 @@ class ProfileRepositoryTest {
     }
 
     private fun createTestProfile(
-            userId: Uuid = Uuid.random(),
-            name: String = "Test Profile",
-            status: ProfileStatus = ProfileStatus.DRAFT
+        userId: Uuid = Uuid.random(),
+        name: String = "Test Profile",
+        status: ProfileStatus = ProfileStatus.DRAFT
     ): Profile {
         return Profile(
-                userId = userId,
-                name = name,
-                insulinType = "Fiasp",
-                durationOfAction = 180,
-                status = status,
-                basal = listOf(BasalSegment(LocalTime(0, 0), 0.5)),
-                icr = listOf(IcrSegment(LocalTime(0, 0), 15.0)),
-                isf = listOf(IsfSegment(LocalTime(0, 0), 40.0)),
-                targets = listOf(TargetSegment(LocalTime(0, 0), 100.0, 110.0))
+            userId = userId,
+            name = name,
+            insulinType = "Fiasp",
+            durationOfAction = 180,
+            status = status,
+            basal = listOf(BasalSegment(LocalTime(0, 0), 0.5)),
+            icr = listOf(IcrSegment(LocalTime(0, 0), 15.0)),
+            isf = listOf(IsfSegment(LocalTime(0, 0), 40.0)),
+            targets = listOf(TargetSegment(LocalTime(0, 0), 100.0, 110.0))
         )
     }
 }

@@ -7,10 +7,12 @@ Welcome to the KDiab Profiles project documentation hub. Use the links below to 
 
 == Core Documents
 
-* link:architecture.html[Architecture]
-* link:requirements.html[Requirements]
+* link:architecture.html[Architecture & Design]
+* link:how-to-run.html[How to Run]
+* link:requirements.html[System Requirements]
+* link:prompts.html[AI Development Prompts]
+* link:ai-agents.html[AI Agent Personas]
 * link:project_status.html[Project Status]
-* link:ai-agents.html[AI Agents]
 * link:session_summary.html[Session Summary]
 
 == Architecture Decision Records (ADR)

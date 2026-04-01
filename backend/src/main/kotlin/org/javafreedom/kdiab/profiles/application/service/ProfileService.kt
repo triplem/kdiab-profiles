@@ -1,12 +1,13 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 package org.javafreedom.kdiab.profiles.application.service
 
 import kotlin.uuid.Uuid
-import kotlin.time.Clock
-import kotlin.time.Instant
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalTime
 import org.javafreedom.kdiab.profiles.domain.model.Profile
 import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
-import org.javafreedom.kdiab.profiles.domain.port.ProfileRepository
+import org.javafreedom.kdiab.profiles.domain.repository.ProfileRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
@@ -26,8 +27,8 @@ class ProfileService(private val profileRepository: ProfileRepository) {
 
         suspend fun getHistory(
                 userId: Uuid,
-                from: kotlin.time.Instant,
-                to: kotlin.time.Instant
+                from: Instant,
+                to: Instant
         ): List<Profile> = profileRepository.findHistory(userId, from, to)
 
         suspend fun getActiveProfile(userId: Uuid): Profile? =
@@ -44,7 +45,7 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                         profile.copy(
                                 id = Uuid.random(),
                                 status = ProfileStatus.ACTIVE,
-                                createdAt = kotlin.time.Clock.System.now(),
+                                createdAt = Clock.System.now(),
                                 previousProfileId = profile.id
                         )
                 } else {
@@ -103,7 +104,7 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                                 profile.copy(
                                         id = Uuid.random(),
                                         status = ProfileStatus.ACTIVE,
-                                        createdAt = kotlin.time.Clock.System.now(),
+                                        createdAt = Clock.System.now(),
                                         previousProfileId = existing.id
                                 )
                         logger.debug { 
@@ -194,7 +195,7 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                         val newVersion = updatedProfile.copy(
                                 id = Uuid.random(),
                                 status = ProfileStatus.ACTIVE,
-                                createdAt = kotlin.time.Clock.System.now(),
+                                createdAt = Clock.System.now(),
                                 previousProfileId = profile.id
                         )
                         return profileRepository.updateActiveProfile(archived, newVersion)

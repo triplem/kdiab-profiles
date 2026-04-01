@@ -4,14 +4,11 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
-import kotlinx.serialization.Serializable
 import org.javafreedom.kdiab.profiles.domain.exception.AuthenticationException
 import org.javafreedom.kdiab.profiles.domain.exception.AuthorizationException
 import org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException
 import org.javafreedom.kdiab.profiles.domain.exception.ResourceNotFoundException
 import io.github.oshai.kotlinlogging.KotlinLogging
-
-@Serializable data class ErrorResponse(val code: Int, val message: String)
 
 private val logger = KotlinLogging.logger {}
 

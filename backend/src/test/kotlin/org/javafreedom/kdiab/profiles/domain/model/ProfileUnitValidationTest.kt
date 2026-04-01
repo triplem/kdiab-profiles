@@ -1,3 +1,4 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 package org.javafreedom.kdiab.profiles.domain.model
 
 import kotlinx.datetime.LocalTime

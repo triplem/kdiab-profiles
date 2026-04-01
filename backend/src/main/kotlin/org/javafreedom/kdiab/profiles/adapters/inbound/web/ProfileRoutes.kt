@@ -53,8 +53,8 @@ private fun Route.getProfileHistory(profileService: ProfileService) {
 
         checkReadAccess(principal, targetUserId)
 
-        val from = kotlin.time.Instant.parse(params.from)
-        val to = kotlin.time.Instant.parse(params.to)
+        val from = kotlinx.datetime.Instant.parse(params.from)
+        val to = kotlinx.datetime.Instant.parse(params.to)
 
         val history = profileService.getHistory(targetUserId, from, to)
         call.respond(history.map { it.toApi() })

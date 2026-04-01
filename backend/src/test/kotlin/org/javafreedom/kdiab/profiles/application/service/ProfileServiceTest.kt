@@ -1,3 +1,4 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 package org.javafreedom.kdiab.profiles.application.service
 
 import io.mockk.coEvery
@@ -16,7 +17,7 @@ import org.javafreedom.kdiab.profiles.domain.model.IsfSegment
 import org.javafreedom.kdiab.profiles.domain.model.Profile
 import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
 import org.javafreedom.kdiab.profiles.domain.model.TargetSegment
-import org.javafreedom.kdiab.profiles.domain.port.ProfileRepository
+import org.javafreedom.kdiab.profiles.domain.repository.ProfileRepository
 
 class ProfileServiceTest {
 

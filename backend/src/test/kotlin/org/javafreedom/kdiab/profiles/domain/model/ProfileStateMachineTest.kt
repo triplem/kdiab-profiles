@@ -1,3 +1,4 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 package org.javafreedom.kdiab.profiles.domain.model
 
 import io.mockk.coEvery
@@ -5,7 +6,7 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalTime
-import org.javafreedom.kdiab.profiles.domain.port.ProfileRepository
+import org.javafreedom.kdiab.profiles.domain.repository.ProfileRepository
 import org.javafreedom.kdiab.profiles.application.service.ProfileService
 import kotlin.test.Test
 import kotlin.test.assertEquals

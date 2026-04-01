@@ -1,3 +1,4 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 package org.javafreedom.kdiab.profiles.infrastructure.persistence
 
 import kotlin.test.AfterTest
@@ -11,20 +12,16 @@ import liquibase.Liquibase
 import liquibase.database.DatabaseFactory
 import liquibase.database.jvm.JdbcConnection
 import liquibase.resource.ClassLoaderResourceAccessor
-import org.javafreedom.kdiab.profiles.domain.model.BasalSegment
-import org.javafreedom.kdiab.profiles.domain.model.Profile
-import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
-import java.sql.SQLException
+import org.javafreedom.kdiab.profiles.domain.model.*
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.statements.*
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.*
 import java.sql.DriverManager
-import kotlin.uuid.toJavaUuid
 
 class ProfileRepositoryConstraintTest {
 
-    private lateinit var repository: PostgresProfileRepository
+    private lateinit var repository: ExposedProfileRepository
 
     companion object {
         // Singleton H2 instance for the test class
@@ -61,7 +58,7 @@ class ProfileRepositoryConstraintTest {
 
     @BeforeTest
     fun setup() {
-        repository = PostgresProfileRepository()
+        repository = ExposedProfileRepository()
         // Clean up data before each test
         transaction {
             exec("DELETE FROM profiles")
@@ -91,16 +88,16 @@ class ProfileRepositoryConstraintTest {
 
     private fun insertTestProfile(userId: Uuid, status: ProfileStatus) {
          Profiles.insert {
-            it[Profiles.id] = Uuid.random()
-            it[Profiles.userId] = userId
-            it[Profiles.name] = "Test Profile"
-            it[Profiles.insulinType] = "Fiasp"
-            it[Profiles.units] = "mg/dl"
-            it[Profiles.durationOfAction] = 180
-            it[Profiles.timeZone] = "UTC"
-            it[Profiles.status] = status
-            it[Profiles.createdAt] = java.time.Instant.now()
-            it[Profiles.segments] = ProfileSegments(
+            it[id] = Uuid.random()
+            it[this.userId] = userId
+            it[name] = "Test Profile"
+            it[insulinType] = "Fiasp"
+            it[units] = "mg/dl"
+            it[durationOfAction] = 180
+            it[timeZone] = "UTC"
+            it[this.status] = status
+            it[createdAt] = java.time.Instant.now()
+            it[segments] = ProfileSegments(
                basal = listOf(BasalSegment(LocalTime(0,0), 1.0))
             )
         }
