@@ -74,7 +74,7 @@ jobs:
       with:
         projectBaseDir: frontend
         args: >
-          -Dsonar.projectKey=triplem_kdiab-profiles-frontend
+          -Dsonar.projectKey=triplem_kdiab-profiles
           -Dsonar.organization=triplem
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.sources=src
