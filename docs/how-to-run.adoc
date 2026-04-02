@@ -11,20 +11,20 @@ Before you begin, ensure you have the following installed:
 * **Docker** and **Docker Compose**
 * OR **Podman** and **podman-compose**
 
-== Quick Start
-
-To start the complete application stack (Backend, Frontend, Database, and Keycloak), run the following command from the project root:
+Before starting the containers, you must build the backend JAR (this ensures the Docker build is fast and consistent with CI):
 
 [source,bash]
 ----
+./gradlew backend:build -x check
 docker-compose up --build
 ----
 
-If you are using Podman:
+If you are using Podman, you can use the helper script:
 
 [source,bash]
 ----
-podman-compose up --build
+./manage-podman.sh build
+./manage-podman.sh start
 ----
 
 === Accessing the Services

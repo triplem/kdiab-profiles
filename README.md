@@ -10,9 +10,12 @@
 To start the full application (Backend + Frontend + Database + Keycloak), run:
 
 ```bash
+# Build the backend JAR first (required for optimized Docker build)
+./gradlew backend:build -x check
+
 docker-compose up --build
 # Or with podman:
-# podman-compose up --build
+# ./manage-podman.sh build && ./manage-podman.sh start
 ```
 
 Access the services at:

@@ -65,3 +65,26 @@ jobs:
       
     - name: Build
       run: npm run build
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: frontend/Dockerfile
+        push: false
+        tags: |
+          kdiab-profiles-frontend:latest
+          kdiab-profiles-frontend:${{ env.VERSION }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        outputs: type=docker,dest=/tmp/frontend-image.tar
+
+    - name: Upload Docker Image
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-image
+        path: /tmp/frontend-image.tar
+        retention-days: 1

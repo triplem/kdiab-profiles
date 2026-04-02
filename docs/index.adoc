@@ -30,6 +30,7 @@ Welcome to the KDiab Profiles project documentation hub. Use the links below to 
 * link:adr/109-strict-24h-time-format.html[109 Strict 24h Time Format]
 * link:adr/110-correlation-id-logging.html[110 Correlation ID Logging]
 * link:adr/111-semantic-release-conventional-commits.html[111 Semantic Release Conventional Commits]
+* link:adr/112-ci-cd-performance-optimizations.html[112 CI/CD Performance Optimizations]
 * link:adr/201-independent-schedules.html[201 Independent Schedules]
 * link:adr/202-jsonb-storage.html[202 JSONB Storage]
 * link:adr/301-postgresql.html[301 PostgreSQL]

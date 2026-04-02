@@ -20,6 +20,8 @@ fi
 
 case "$1" in
     build)
+        echo "=> Building backend JAR with Gradle..."
+        ./gradlew backend:build -x check
         echo "=> Starting podman build..."
         podman-compose build
         ;;

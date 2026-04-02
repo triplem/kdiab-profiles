@@ -9,7 +9,8 @@
     "@semantic-release/release-notes-generator",
     ["@semantic-release/github", {
       "assets": [
-        {"path": "backend-image.tar", "label": "Backend Docker Image"}
+        {"path": "backend-image.tar", "label": "Backend Docker Image"},
+        {"path": "frontend-image.tar", "label": "Frontend Docker Image"}
       ]
     }]
   ]

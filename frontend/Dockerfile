@@ -1,27 +1,10 @@
-# Stage 1: Build the frontend
-FROM node:20-alpine AS build
-
-# Install Java required by openapi-generator-cli
-RUN apk add --no-cache openjdk17-jre
-
-WORKDIR /app
-# We need to copy both api and frontend directories
-COPY frontend/package*.json ./frontend/
-WORKDIR /app/frontend
-RUN npm install
-RUN npm ci
-
-WORKDIR /app
-COPY api/ ./api/
-COPY frontend/ ./frontend/
-
-WORKDIR /app/frontend
-# We don't need to bake API_URL if we use relative paths / proxy
-RUN npm run build
-
-# Stage 2: Serve with Nginx
+# Serve with Nginx
 FROM nginx:alpine
-COPY --from=build /app/frontend/dist /usr/share/nginx/html
+
+# Copy the static assets from the host (built by CI)
+# e.g., npm run build
+ARG DIST_PATH=frontend/dist
+COPY ${DIST_PATH} /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Grant permissions to the nginx user for rootless execution
