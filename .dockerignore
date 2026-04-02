@@ -3,6 +3,8 @@
 build
 */build
 */*/build
+!backend/build/libs/*.jar
+!frontend/dist/
 out
 .vscode
 .git
