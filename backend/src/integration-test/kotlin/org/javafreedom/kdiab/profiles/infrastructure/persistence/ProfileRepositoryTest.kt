@@ -54,9 +54,9 @@ class ProfileRepositoryTest {
 
         val retrieved = repository.findById(profile.id)
         assertNotNull(retrieved)
-        assertEquals(profile.id, retrieved?.id)
-        assertEquals(profile.name, retrieved?.name)
-        assertEquals(1, retrieved?.basal?.size)
+        assertEquals(profile.id, retrieved.id)
+        assertEquals(profile.name, retrieved.name)
+        assertEquals(1, retrieved.basal.size)
     }
 
     @Test
@@ -87,7 +87,7 @@ class ProfileRepositoryTest {
 
         val active = repository.findActiveByUserId(userId)
         assertNotNull(active)
-        assertEquals("Active", active?.name)
+        assertEquals("Active", active.name)
     }
 
     @Test
@@ -99,8 +99,9 @@ class ProfileRepositoryTest {
         repository.update(updated)
 
         val retrieved = repository.findById(profile.id)
-        assertEquals("Updated Name", retrieved?.name)
-        assertEquals(ProfileStatus.ACTIVE, retrieved?.status)
+        assertNotNull(retrieved)
+        assertEquals("Updated Name", retrieved.name)
+        assertEquals(ProfileStatus.ACTIVE, retrieved.status)
     }
 
     private fun createTestProfile(

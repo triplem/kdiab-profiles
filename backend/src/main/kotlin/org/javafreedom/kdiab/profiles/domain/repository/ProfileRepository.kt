@@ -2,7 +2,7 @@
 package org.javafreedom.kdiab.profiles.domain.repository
 
 import kotlin.uuid.Uuid
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import org.javafreedom.kdiab.profiles.domain.model.Profile
 import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
 

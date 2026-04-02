@@ -4,7 +4,7 @@ package org.javafreedom.kdiab.profiles.domain.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalTime
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

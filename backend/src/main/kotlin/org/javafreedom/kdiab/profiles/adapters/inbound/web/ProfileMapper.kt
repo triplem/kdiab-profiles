@@ -2,8 +2,8 @@
 package org.javafreedom.kdiab.profiles.adapters.inbound.web
 
 import kotlin.uuid.Uuid
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import org.javafreedom.kdiab.profiles.api.models.BasalSegment
 import org.javafreedom.kdiab.profiles.api.models.CreateProfileRequest
 import org.javafreedom.kdiab.profiles.api.models.IcrSegment
@@ -59,7 +59,7 @@ fun Profile.toDomain(): DomainProfile {
         durationOfAction = this.durationOfAction,
         status = ProfileStatus.valueOf(this.status.name),
         previousProfileId = this.previousProfileId?.let { Uuid.parse(it) },
-        createdAt = Instant.parse(this.createdAt ?: Clock.System.now().toString()),
+        createdAt = (this.createdAt ?: Clock.System.now().toString()).let { Instant.parse(it) },
         basal = this.basal?.map {
             org.javafreedom.kdiab.profiles.domain.model.BasalSegment(
                 kotlinx.datetime.LocalTime.parse(it.startTime),
