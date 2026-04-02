@@ -60,7 +60,7 @@ jobs:
         fi
 
     - name: Build and Test
-      run: ./gradlew backend:build -Pversion=${{ env.VERSION }}
+      run: ./gradlew backend:build backend:cyclonedxBom -Pversion=${{ env.VERSION }}
     
     - name: SonarCloud Scan
       uses: SonarSource/sonarcloud-github-action@master
@@ -99,4 +99,11 @@ jobs:
       with:
         name: backend-image
         path: /tmp/backend-image.tar
+        retention-days: 1
+    
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-bom
+        path: backend/build/reports/cyclonedx/bom.json
         retention-days: 1

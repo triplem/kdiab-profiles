@@ -18,6 +18,7 @@ asciidoctor = "4.0.5"
 kotest = "5.8.0"
 liquibase = "4.29.1"
 kotlinx-coroutines = "1.10.2"
+cyclonedx = "3.2.2"
 [libraries]
 ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
@@ -65,6 +66,7 @@ sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 asciidoctor = { id = "org.asciidoctor.jvm.convert", version.ref = "asciidoctor" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
 
 
 [bundles]

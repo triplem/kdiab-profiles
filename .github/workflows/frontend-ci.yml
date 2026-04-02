@@ -65,6 +65,11 @@ jobs:
       
     - name: Build
       run: npm run build
+    
+    - name: Generate SBOM
+      run: |
+        npx @cyclonedx/cyclonedx-npm --output-format JSON --output-file bom.json
+        mv bom.json frontend-bom.json
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -87,4 +92,11 @@ jobs:
       with:
         name: frontend-image
         path: /tmp/frontend-image.tar
+        retention-days: 1
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-bom
+        path: frontend/frontend-bom.json
         retention-days: 1

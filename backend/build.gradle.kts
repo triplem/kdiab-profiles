@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.openapi.generator)
     alias(libs.plugins.detekt)
     alias(libs.plugins.kover)
+    alias(libs.plugins.cyclonedx)
     application
 }
 
@@ -252,3 +253,5 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 tasks.named<Delete>("clean") {
     delete(layout.projectDirectory.dir("bin"))
 }
+
+// Using default CycloneDX configuration for now
