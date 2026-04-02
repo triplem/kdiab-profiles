@@ -58,10 +58,12 @@ export const ProfileList: React.FC<ProfileListProps> = ({ userId, onSelectProfil
 
   const renderProfileCard = (profile: Profile) => {
     const isExpanded = expandedProfileId === profile.id;
+    const isActive = (profile.status as string) === 'ACTIVE';
     return (
-      <div key={profile.id} className="profile-card" onClick={() => {
+      <div key={profile.id} className={`profile-card ${isActive ? 'active' : ''}`} onClick={() => {
         toggleExpand(profile.id);
       }}>
+        {isActive && <div className="active-glow" />}
         <div className="profile-card-header">
           <strong>{profile.name}</strong>
           <div>

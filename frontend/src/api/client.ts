@@ -12,11 +12,15 @@ axiosInstance.interceptors.request.use((config) => {
   }
 
   // Retrieve token from oidc storage
-  const oidcStorageStr = sessionStorage.getItem(`oidc.user:http://localhost:8081/realms/kdiab-profiles:kdiab-frontend`);
+  const authority = "http://localhost:8081/realms/kdiab-profiles";
+  const clientId = "kdiab-frontend";
+  const oidcStorageKey = `oidc.user:${authority}:${clientId}`;
+  const oidcStorageStr = sessionStorage.getItem(oidcStorageKey);
+  
   if (oidcStorageStr) {
     try {
       const oidcStorage = JSON.parse(oidcStorageStr);
-      if (oidcStorage && oidcStorage.access_token) {
+      if (oidcStorage?.access_token) {
         config.headers['Authorization'] = `Bearer ${oidcStorage.access_token}`;
       }
     } catch (e) {

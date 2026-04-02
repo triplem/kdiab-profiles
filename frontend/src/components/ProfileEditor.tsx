@@ -8,56 +8,74 @@ import { useQuery } from '@tanstack/react-query';
 import { useTimeFormat } from '../context/TimeFormatContext';
 import { TimeInput } from './TimeInput';
 
-const getNextSegment = <T extends { startTime: string, value: number }>(
+export const getNextSegment = <T extends { startTime: string, value: number }>(
   fields: T[], 
   defaultValue: number
 ) => {
   if (fields.length === 0) return { startTime: "00:00", value: defaultValue };
-  const last = fields[fields.length - 1];
+  
+  // Sort fields to find the actual last one chronologically
+  const sorted = [...fields].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const last = sorted[sorted.length - 1];
+  
   const [h, m] = last.startTime.split(':').map(Number);
-  const nextH = (h + 1) % 24;
-  const nextStartTime = `${String(nextH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const totalMinutes = h * 60 + m;
+  const nextTotalMinutes = Math.min(totalMinutes + 60, 23 * 60 + 45); // Max 23:45
+  
+  const nextH = Math.floor(nextTotalMinutes / 60);
+  const nextM = nextTotalMinutes % 60;
+  
+  const nextStartTime = `${String(nextH).padStart(2, '0')}:${String(nextM).padStart(2, '0')}`;
+  
+  // If we already reached the end, just return the last one + a tiny increment if possible, 
+  // but usually 60m is fine for UX.
   return { startTime: nextStartTime, value: last.value };
 };
 
 
 // Define Validation Schema
 const timeSegmentSchema = z.object({
-  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
+  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time (HH:MM)"),
   value: z.number().min(0, "Value must be positive"),
 });
 
+const validateChronological = (arr: { startTime: string }[]) => {
+  if (arr.length <= 1) return true;
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (arr[i].startTime >= arr[i+1].startTime) return false;
+  }
+  return true;
+};
+
 const icrSegmentSchema = z.object({
-  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
+  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time (HH:MM)"),
   value: z.number().min(1.0, "ICR must be >= 1.0 g/U").max(50.0, "ICR must be <= 50.0 g/U"),
 });
 
 const isfSegmentSchema = z.object({
-  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
+  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time (HH:MM)"),
   value: z.number().min(10.0, "ISF must be >= 10.0 mg/dL").max(200.0, "ISF must be <= 200.0 mg/dL"),
 });
 
 const profileSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().trim().min(1, "Name is required"),
   insulinType: z.string().min(1, "Insulin type is required"),
-  durationOfAction: z.number().min(1, "Duration must be positive (minutes)"),
-  basal: z.array(timeSegmentSchema).nonempty("At least one basal segment required"),
-  icr: z.array(icrSegmentSchema).refine(arr => {
-    if (arr.length === 0) return true;
-    const sorted = [...arr].sort((a,b) => a.startTime.localeCompare(b.startTime));
-    return sorted[0].startTime === "00:00";
-  }, "ICR profile must start at 00:00"),
-  isf: z.array(isfSegmentSchema).refine(arr => {
-    if (arr.length === 0) return true;
-    const sorted = [...arr].sort((a,b) => a.startTime.localeCompare(b.startTime));
-    return sorted[0].startTime === "00:00";
-  }, "ISF profile must start at 00:00")
+  durationOfAction: z.number().int().min(1, "Duration must be positive (minutes)"),
+  basal: z.array(timeSegmentSchema)
+    .nonempty("At least one basal segment required")
+    .refine(arr => arr[0].startTime === "00:00", "Basal must start at 00:00")
+    .refine(validateChronological, "Basal segments must be chronological"),
+  icr: z.array(icrSegmentSchema)
+    .refine(arr => arr.length === 0 || arr[0].startTime === "00:00", "ICR must start at 00:00")
+    .refine(validateChronological, "ICR segments must be chronological"),
+  isf: z.array(isfSegmentSchema)
+    .refine(arr => arr.length === 0 || arr[0].startTime === "00:00", "ISF must start at 00:00")
+    .refine(validateChronological, "ISF segments must be chronological")
 }).refine((data) => {
   if (!data.basal || data.basal.length === 0) return true;
   let totalDailyBasal = 0;
   for (let i = 0; i < data.basal.length; i++) {
     const current = data.basal[i];
-    // Need a chronological check so the calculation makes sense
     let nextTimeStr = "24:00";
     if (i + 1 < data.basal.length) {
        nextTimeStr = data.basal[i + 1].startTime;
@@ -70,13 +88,11 @@ const profileSchema = z.object({
     const nextMinutes = nextH === 24 ? 24 * 60 : nextH * 60 + nextM;
     
     const durationHours = (nextMinutes - currMinutes) / 60.0;
-    if (durationHours <= 0) return false; // Must be in ascending chronological order
-    
     totalDailyBasal += current.value * durationHours;
   }
   return totalDailyBasal <= 150.0;
 }, {
-  message: "Total Daily Basal exceeds safe clinical limit of 150.0 U/day or segments overlap",
+  message: "Total Daily Basal exceeds safe clinical limit of 150.0 U/day",
   path: ["basal"]
 });
 
@@ -298,10 +314,28 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ userId, initialPro
            {errors.durationOfAction && <span>{errors.durationOfAction.message}</span>}
         </div>
 
-        <div className="tabs" style={{ display: 'flex', gap: '10px', marginTop: '20px', marginBottom: '15px', borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
-          <button type="button" style={{ fontWeight: activeTab === 'basal' ? 'bold' : 'normal', backgroundColor: activeTab === 'basal' ? '#e0e0e0' : 'transparent', color: '#333' }} onClick={() => setActiveTab('basal')}>Basal</button>
-          <button type="button" style={{ fontWeight: activeTab === 'icr' ? 'bold' : 'normal', backgroundColor: activeTab === 'icr' ? '#e0e0e0' : 'transparent', color: '#333' }} onClick={() => setActiveTab('icr')}>ICR</button>
-          <button type="button" style={{ fontWeight: activeTab === 'isf' ? 'bold' : 'normal', backgroundColor: activeTab === 'isf' ? '#e0e0e0' : 'transparent', color: '#333' }} onClick={() => setActiveTab('isf')}>ISF</button>
+        <div className="tabs">
+          <button 
+            type="button" 
+            className={`tab-button ${activeTab === 'basal' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('basal')}
+          >
+            Basal
+          </button>
+          <button 
+            type="button" 
+            className={`tab-button ${activeTab === 'icr' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('icr')}
+          >
+            ICR
+          </button>
+          <button 
+            type="button" 
+            className={`tab-button ${activeTab === 'isf' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('isf')}
+          >
+            ISF
+          </button>
         </div>
 
         {activeTab === 'basal' && (
