@@ -1,5 +1,5 @@
 # Run the application
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # Create a non-root user for security
 RUN addgroup -S ktor && adduser -S ktor -G ktor
