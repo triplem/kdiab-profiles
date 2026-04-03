@@ -29,10 +29,10 @@ jobs:
         working-directory: ./frontend
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Use Node.js 20
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: '20'
         cache: 'npm'
@@ -88,10 +88,10 @@ jobs:
         mv bom.json frontend-bom.json
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
       
     - name: Build Docker Image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: frontend/Dockerfile
@@ -104,14 +104,14 @@ jobs:
         outputs: type=docker,dest=/tmp/frontend-image.tar
 
     - name: Upload Docker Image
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: frontend-image
         path: /tmp/frontend-image.tar
         retention-days: 1
 
     - name: Upload SBOM
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: frontend-bom
         path: frontend/frontend-bom.json
