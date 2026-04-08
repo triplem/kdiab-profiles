@@ -6,13 +6,14 @@ import App from './App.tsx'
 import { AuthProvider } from 'react-oidc-context'
 
 const oidcConfig = {
-  authority: "http://localhost:8081/realms/kdiab-profiles",
-  client_id: "kdiab-frontend",
+  authority: import.meta.env.VITE_OIDC_AUTHORITY ?? 'http://localhost:8081/realms/kdiab-profiles',
+  client_id: import.meta.env.VITE_OIDC_CLIENT_ID ?? 'kdiab-frontend',
   redirect_uri: window.location.origin,
   post_logout_redirect_uri: window.location.origin,
+  automaticSilentRenew: true,
   onSigninCallback: () => {
-    window.history.replaceState( {}, document.title, window.location.pathname );
-  }
+    window.history.replaceState({}, document.title, window.location.pathname);
+  },
 };
 
 const queryClient = new QueryClient({

@@ -87,6 +87,16 @@ testing {
 
             dependencies {
                 implementation(project())
+                // Exposed ORM — needed because the integrationTest classpath is separate from testImplementation
+                implementation(libs.exposed.core)
+                implementation(libs.exposed.jdbc)
+                implementation(libs.exposed.java.time)
+                implementation(libs.exposed.json)
+                // Runtime dependencies for async DB operations
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.datetime)
+                // In-memory database for integration tests
+                implementation(libs.h2)
             }
 
             targets {

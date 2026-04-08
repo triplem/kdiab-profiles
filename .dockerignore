@@ -3,8 +3,8 @@
 build
 */build
 */*/build
-!backend/build/libs/*.jar
-!frontend/dist/
+frontend/node_modules
+frontend/coverage
 out
 .vscode
 .git

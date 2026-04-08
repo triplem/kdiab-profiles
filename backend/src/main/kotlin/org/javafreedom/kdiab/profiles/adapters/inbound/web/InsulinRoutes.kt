@@ -9,9 +9,11 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import org.javafreedom.kdiab.profiles.domain.repository.InsulinRepository
+import org.javafreedom.kdiab.profiles.plugins.UserPrincipal
 import kotlin.uuid.Uuid
 import org.javafreedom.kdiab.profiles.api.models.Insulin as ApiInsulin
 import org.javafreedom.kdiab.profiles.domain.model.Insulin as DomainInsulin
+
 @Serializable
 data class InsulinRequest(val name: String)
 
@@ -31,6 +33,11 @@ fun Route.insulinRoutes(repository: InsulinRepository) {
 
             route("/{id}") {
                 put {
+                    val principal = call.principal<UserPrincipal>()
+                    if (principal == null || !principal.isAdmin()) {
+                        call.respond(HttpStatusCode.Forbidden)
+                        return@put
+                    }
                     val idString = call.parameters["id"]
                     if (idString == null) {
                         call.respond(HttpStatusCode.BadRequest)
@@ -45,8 +52,13 @@ fun Route.insulinRoutes(repository: InsulinRepository) {
                         call.respond(HttpStatusCode.NotFound)
                     }
                 }
-                
+
                 delete {
+                    val principal = call.principal<UserPrincipal>()
+                    if (principal == null || !principal.isAdmin()) {
+                        call.respond(HttpStatusCode.Forbidden)
+                        return@delete
+                    }
                     val idString = call.parameters["id"]
                     if (idString == null) {
                         call.respond(HttpStatusCode.BadRequest)

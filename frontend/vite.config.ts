@@ -10,6 +10,12 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     include: ['src/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['lcov', 'text-summary'],
+      reportsDirectory: './coverage',
+      exclude: ['src/api/generated/**', 'src/test/**', '*.config.*'],
+    },
   },
   build: {
     sourcemap: true,

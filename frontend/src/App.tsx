@@ -61,12 +61,9 @@ function App() {
   }
 
   if (!auth.isAuthenticated || !auth.user) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <h2>Welcome to T1D Profile Manager</h2>
-        <button onClick={() => void auth.signinRedirect()}>Log in</button>
-      </div>
-    );
+    // Auto-redirect to Keycloak — no manual button needed
+    void auth.signinRedirect();
+    return <div>Redirecting to login...</div>;
   }
 
   const userId = auth.user?.profile?.sub || 'unknown';

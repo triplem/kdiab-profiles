@@ -133,6 +133,27 @@ label {
   font-size: 0.9rem;
 }
 
+/* Button utility modifiers */
+.btn.small {
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
+.btn.danger {
+  background: var(--accent-danger, #e53e3e);
+  color: white;
+}
+
+.btn.danger:hover {
+  background: var(--accent-danger-hover, #c53030);
+}
+
+.btn.outline {
+  background: transparent;
+  border: 1px solid currentColor;
+}
+
 /* Card Grid for ProfileList */
 .card-grid {
   display: grid;
@@ -329,6 +350,14 @@ label {
 .status-proposed { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
 .status-archived { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
 .status-draft { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+/* Unsaved changes indicator */
+.unsaved-indicator {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--accent-warning);
+  margin-left: 0.25rem;
+}
 
 /* Form Error States */
 .error-text {

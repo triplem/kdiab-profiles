@@ -20,9 +20,7 @@ fi
 
 case "$1" in
     build)
-        echo "=> Building backend JAR with Gradle..."
-        ./gradlew backend:build -x check
-        echo "=> Starting podman build..."
+        echo "=> Building images with podman-compose (backend and frontend are built inside Docker)..."
         podman-compose build
         ;;
     start)
@@ -36,7 +34,7 @@ case "$1" in
     cleanup)
         echo "=> Stopping environment and removing volumes..."
         podman-compose down -v
-        
+
         echo "=> Cleaning up generated podman images for kdiab-profiles..."
         # Find images tagged with 'kdiab-profiles' or 'localhost/kdiab-profiles' and remove them
         podman images | grep "kdiab-profiles" | awk '{print $3}' | xargs -r podman rmi -f

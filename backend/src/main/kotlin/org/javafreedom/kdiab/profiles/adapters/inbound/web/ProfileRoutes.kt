@@ -93,7 +93,9 @@ private fun Route.createProfile(profileService: ProfileService) {
 
         checkReadAccess(principal, targetUserId)
 
-        val status = if (principal?.isDoctor() == true && principal.userId != targetUserId) {
+        val status = if (principal?.isDoctor() == true &&
+                principal.userId != targetUserId &&
+                principal.allowedPatients.contains(targetUserId)) {
             org.javafreedom.kdiab.profiles.domain.model.ProfileStatus.PROPOSED
         } else {
             checkWriteAccess(principal, targetUserId)

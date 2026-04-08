@@ -21,7 +21,12 @@ fun Application.configureSecurity() {
     val jwtDomain = environment.config.property("jwt.domain").getString()
     val jwtRealm = environment.config.property("jwt.realm").getString()
     val isTest = environment.config.propertyOrNull("jwt.test")?.getString()?.toBoolean() ?: false
-    val jwtSecret = environment.config.propertyOrNull("jwt.secret")?.getString() ?: "secret"
+    val explicitSecret = environment.config.propertyOrNull("jwt.secret")?.getString()
+    check(!isTest || explicitSecret != null) {
+        "jwt.secret (JWT_SECRET env var) must be set explicitly when jwt.test=true. " +
+        "Do not use the test JWT mode in production."
+    }
+    val jwtSecret = explicitSecret ?: "secret"
 
     val jwkProvider = if (!isTest) {
         val jwksUrl = environment.config.propertyOrNull("jwt.jwksUrl")?.getString() 

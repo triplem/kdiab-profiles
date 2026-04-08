@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 3-fix-insulin-name-length
+      author: javafreedom
+      comment: Fix off-by-one between Liquibase migration (254) and Exposed column definition (255)
+      changes:
+        - modifyDataType:
+            tableName: insulins
+            columnName: name
+            newDataType: varchar(255)

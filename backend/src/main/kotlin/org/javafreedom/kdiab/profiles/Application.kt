@@ -24,6 +24,8 @@ fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 fun Application.module(
         profileService: ProfileService = ProfileService(ExposedProfileRepository()),
+        insulinRepository: org.javafreedom.kdiab.profiles.domain.repository.InsulinRepository =
+                ExposedInsulinRepository(),
         initDatabase: Boolean = true
 ) {
     configureLogging()
@@ -51,7 +53,7 @@ fun Application.module(
         route("/api/v1") {
             profileRoutes(profileService)
         }
-        insulinRoutes(ExposedInsulinRepository())
+        insulinRoutes(insulinRepository)
 
         swaggerUI(path = "swagger", swaggerFile = "openapi.yaml")
     }

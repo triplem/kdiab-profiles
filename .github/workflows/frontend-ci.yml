@@ -6,11 +6,13 @@ on:
     paths:
       - 'frontend/**'
       - 'api/openapi.yaml'
+      - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches: [ "**" ]
     paths:
       - 'frontend/**'
       - 'api/openapi.yaml'
+      - '.github/workflows/frontend-ci.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,21 +25,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     defaults:
       run:
         working-directory: ./frontend
 
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Use Node.js 20
+      with:
+        fetch-depth: 0
+
+    - name: Use Node.js 22
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
-        
+
     - name: Install dependencies
       run: npm ci
 
@@ -59,15 +63,16 @@ jobs:
 
     - name: Generate API Client
       run: npm run api:generate
-      
+
+    - name: Lint
+      run: npm run lint
+
     - name: Run Tests
-      run: npm test -- --run
-      
-    - name: Build
-      run: npm run build
-      
+      run: npm test -- --run --coverage
+
     - name: SonarCloud Scan
-      uses: SonarSource/sonarcloud-github-action@master
+      if: env.SONAR_TOKEN != ''
+      uses: SonarSource/sonarcloud-github-action@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -81,7 +86,7 @@ jobs:
           -Dsonar.exclusions=src/__tests__/**
           -Dsonar.tests=src/__tests__
           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-    
+
     - name: Generate SBOM
       run: |
         npx @cyclonedx/cyclonedx-npm --output-format JSON --output-file bom.json
@@ -89,7 +94,7 @@ jobs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      
+
     - name: Build Docker Image
       uses: docker/build-push-action@v5
       with:

@@ -2,15 +2,17 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, customApi } from '../api/client';
 import type { Profile } from '../api/generated';
+import { useTimeFormat } from '../context/TimeFormatContext';
 
 interface ProfileListProps {
   userId: string;
   onSelectProfile?: (profile: Profile) => void;
 }
 
-export const ProfileList: React.FC<ProfileListProps> = ({ userId, onSelectProfile }) => {
+export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
   const queryClient = useQueryClient();
   const [expandedProfileId, setExpandedProfileId] = React.useState<string | null>(null);
+  const { formatDate } = useTimeFormat();
 
   const { data: profiles = [] as Profile[], isLoading, isError, error } = useQuery<Profile[]>({
     queryKey: ['profiles', userId],
@@ -43,7 +45,16 @@ export const ProfileList: React.FC<ProfileListProps> = ({ userId, onSelectProfil
 
   const handleReject = (e: React.MouseEvent, profileId: string) => {
     e.stopPropagation();
-    rejectMutation.mutate(profileId);
+    if (window.confirm('Rejecting this proposal will archive it permanently. Continue?')) {
+      rejectMutation.mutate(profileId);
+    }
+  };
+
+  const handleActivate = (e: React.MouseEvent, profileId: string) => {
+    e.stopPropagation();
+    if (window.confirm('Activating this profile will archive your current active configuration. Continue?')) {
+      activateMutation.mutate(profileId);
+    }
   };
 
   if (isLoading) return <div className="loading">Loading profiles...</div>;
@@ -70,19 +81,18 @@ export const ProfileList: React.FC<ProfileListProps> = ({ userId, onSelectProfil
             <span className={`status-badge status-${(profile.status as string || 'Unknown').toLowerCase()}`}>{profile.status as string || 'Unknown'}</span>
             <button 
               onClick={(e) => { e.stopPropagation(); onSelectProfile?.(profile); }}
-              className="btn"
-              style={{ marginLeft: '10px', padding: '2px 8px', fontSize: '0.8rem' }}
+              className="btn small"
             >
               Edit
             </button>
             {profile.status !== 'ACTIVE' && profile.status !== 'PROPOSED' && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); activateMutation.mutate(profile.id); }}
-                className="btn primary"
-                style={{ marginLeft: '10px', padding: '2px 8px', fontSize: '0.8rem' }}
+              <button
+                onClick={(e) => handleActivate(e, profile.id)}
+                className="btn primary small"
                 disabled={activateMutation.isPending}
+                aria-label={`Activate profile ${profile.name}`}
               >
-                {activateMutation.isPending && activateMutation.variables === profile.id ? 'Activating...' : 'Activate'}
+                {activateMutation.isPending && activateMutation.variables === profile.id ? 'Activating…' : 'Activate'}
               </button>
             )}
           </div>
@@ -118,24 +128,39 @@ export const ProfileList: React.FC<ProfileListProps> = ({ userId, onSelectProfil
                   </ul>
                 </div>
               )}
+              {profile.targets && profile.targets.length > 0 && (
+                <div className="detail-section">
+                  <h4>BG Targets</h4>
+                  <ul>
+                    {profile.targets.map((t, i) => <li key={i}>{t?.startTime} - {t?.low}–{t?.high} mg/dL</li>)}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>
         {(profile.status as string) === 'PROPOSED' && (
           <div className="proposal-actions">
-            <button 
-              onClick={(e) => handleAccept(e, profile.id)} 
+            {profile.createdAt && (
+              <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', width: '100%' }}>
+                Proposed on {formatDate(profile.createdAt)}
+              </p>
+            )}
+            <button
+              onClick={(e) => handleAccept(e, profile.id)}
               className="btn primary"
               disabled={acceptMutation.isPending}
+              aria-label={`Accept proposed profile ${profile.name}`}
             >
-              {acceptMutation.isPending && acceptMutation.variables === profile.id ? 'Accepting...' : 'Accept'}
+              {acceptMutation.isPending && acceptMutation.variables === profile.id ? 'Accepting…' : 'Accept'}
             </button>
-            <button 
-              onClick={(e) => handleReject(e, profile.id)} 
+            <button
+              onClick={(e) => handleReject(e, profile.id)}
               className="btn danger outline"
               disabled={rejectMutation.isPending}
+              aria-label={`Reject proposed profile ${profile.name}`}
             >
-              {rejectMutation.isPending && rejectMutation.variables === profile.id ? 'Rejecting...' : 'Reject'}
+              {rejectMutation.isPending && rejectMutation.variables === profile.id ? 'Rejecting…' : 'Reject'}
             </button>
           </div>
         )}

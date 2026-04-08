@@ -1,9 +1,15 @@
 import { DefaultApi } from './generated';
 import axios from 'axios';
 
+// OIDC config — override via .env (VITE_OIDC_AUTHORITY, VITE_OIDC_CLIENT_ID) for staging/prod
+const OIDC_CONFIG = {
+  authority: import.meta.env.VITE_OIDC_AUTHORITY ?? 'http://localhost:8081/realms/kdiab-profiles',
+  clientId: import.meta.env.VITE_OIDC_CLIENT_ID ?? 'kdiab-frontend',
+};
+
 // Create a single axios instance
 const axiosInstance = axios.create({
-  baseURL: '/api/v1', // Proxy will handle this or direct URL
+  baseURL: '/api/v1',
 });
 
 axiosInstance.interceptors.request.use((config) => {
@@ -11,12 +17,9 @@ axiosInstance.interceptors.request.use((config) => {
     config.headers['X-Correlation-ID'] = crypto.randomUUID();
   }
 
-  // Retrieve token from oidc storage
-  const authority = "http://localhost:8081/realms/kdiab-profiles";
-  const clientId = "kdiab-frontend";
-  const oidcStorageKey = `oidc.user:${authority}:${clientId}`;
+  const oidcStorageKey = `oidc.user:${OIDC_CONFIG.authority}:${OIDC_CONFIG.clientId}`;
   const oidcStorageStr = sessionStorage.getItem(oidcStorageKey);
-  
+
   if (oidcStorageStr) {
     try {
       const oidcStorage = JSON.parse(oidcStorageStr);

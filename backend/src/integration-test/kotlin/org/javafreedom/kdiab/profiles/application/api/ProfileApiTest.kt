@@ -24,13 +24,20 @@ import org.javafreedom.kdiab.profiles.module
 
 class ProfileApiTest {
 
-        private fun generateToken(role: Role, userId: Uuid = Uuid.random()): String {
-                return JWT.create()
+        private fun generateToken(
+                role: Role,
+                userId: Uuid = Uuid.random(),
+                allowedPatients: List<Uuid> = emptyList()
+        ): String {
+                val builder = JWT.create()
                         .withAudience("profile")
                         .withIssuer("org.javafreedom.kdiab")
                         .withSubject(userId.toString())
                         .withClaim("roles", listOf(role.name))
-                        .sign(Algorithm.HMAC256("secret"))
+                if (allowedPatients.isNotEmpty()) {
+                        builder.withClaim("allowed_patients", allowedPatients.map { it.toString() })
+                }
+                return builder.sign(Algorithm.HMAC256("secret"))
         }
 
         @Test
@@ -178,6 +185,92 @@ class ProfileApiTest {
                         }
                         .apply { assertEquals(HttpStatusCode.InternalServerError, status) }
         }
+        // ── Doctor PROPOSED status gate ──────────────────────────────────────────
+
+        @Test
+        fun `doctor creates PROPOSED profile for an allowed patient`() = testApplication {
+                val profileService = mockk<ProfileService>()
+                setupApp(profileService)
+
+                val client = createClient { install(ContentNegotiation) { json() } }
+                val patientId = Uuid.random()
+                val doctorId = Uuid.random()
+                val token = generateToken(Role.DOCTOR, doctorId, allowedPatients = listOf(patientId))
+
+                val proposedProfile = Profile(
+                        id = Uuid.random(),
+                        userId = patientId,
+                        name = "Doctor Plan",
+                        status = ProfileStatus.PROPOSED,
+                        insulinType = "Fiasp",
+                        durationOfAction = 180,
+                        basal = emptyList(),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList()
+                )
+                coEvery { profileService.createProfile(any()) } returns proposedProfile
+
+                client.post("/api/v1/users/$patientId/profiles") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                                """
+                                {
+                                    "name": "Doctor Plan",
+                                    "insulinType": "Fiasp",
+                                    "durationOfAction": 180,
+                                    "basal": [],
+                                    "icr": [],
+                                    "isf": [],
+                                    "targets": []
+                                }
+                                """.trimIndent()
+                        )
+                }.apply {
+                        assertEquals(HttpStatusCode.Created, status)
+                        // Verify the service was called with PROPOSED status
+                        io.mockk.coVerify {
+                                profileService.createProfile(
+                                        match { it.status == ProfileStatus.PROPOSED }
+                                )
+                        }
+                }
+        }
+
+        @Test
+        fun `doctor cannot create profile for patient NOT in allowedPatients`() = testApplication {
+                val profileService = mockk<ProfileService>()
+                setupApp(profileService)
+
+                val client = createClient { install(ContentNegotiation) { json() } }
+                val patientId = Uuid.random()
+                val doctorId = Uuid.random()
+                // allowedPatients does NOT include patientId
+                val token = generateToken(Role.DOCTOR, doctorId, allowedPatients = emptyList())
+
+                client.post("/api/v1/users/$patientId/profiles") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                                """
+                                {
+                                    "name": "Unauthorised Plan",
+                                    "insulinType": "Fiasp",
+                                    "durationOfAction": 180,
+                                    "basal": [],
+                                    "icr": [],
+                                    "isf": [],
+                                    "targets": []
+                                }
+                                """.trimIndent()
+                        )
+                }.apply {
+                        assertEquals(HttpStatusCode.Forbidden, status)
+                        io.mockk.coVerify(exactly = 0) { profileService.createProfile(any()) }
+                }
+        }
+
         private fun ApplicationTestBuilder.setupApp(service: ProfileService) {
                 environment {
                         config =
