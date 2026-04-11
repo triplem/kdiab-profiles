@@ -15,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 import org.javafreedom.kdiab.profiles.domain.exception.AuthorizationException
+import org.javafreedom.kdiab.profiles.domain.exception.ConflictException
 import org.javafreedom.kdiab.profiles.domain.exception.ResourceNotFoundException
 import org.javafreedom.kdiab.profiles.domain.model.Profile
 import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
@@ -146,13 +147,13 @@ class ProfileApiTest {
                         }
                         .apply { assertEquals(HttpStatusCode.NotFound, status) }
 
-                // 5. Delete All Profiles -> Returns false (ResourceNotFound)
+                // 5. Delete All Profiles -> Always 204 (idempotent — no drafts is still success)
                 coEvery { profileService.deleteAllProfiles(userId) } returns false
                 client
                         .delete("/api/v1/users/$userId/profiles") {
                                 header(HttpHeaders.Authorization, "Bearer $token")
                         }
-                        .apply { assertEquals(HttpStatusCode.NotFound, status) }
+                        .apply { assertEquals(HttpStatusCode.NoContent, status) }
 
                 // 6. IllegalArgumentException
                 coEvery { profileService.createProfile(any()) } throws
@@ -185,6 +186,30 @@ class ProfileApiTest {
                         }
                         .apply { assertEquals(HttpStatusCode.InternalServerError, status) }
         }
+        // ── Conflict (concurrent activation) → 409 ───────────────────────────────
+
+        @Test
+        fun `activateProfile returns 409 when service throws ConflictException`() = testApplication {
+                val profileService = mockk<ProfileService>()
+                setupApp(profileService)
+
+                val client = createClient { install(ContentNegotiation) { json() } }
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val token = generateToken(Role.PATIENT, userId)
+
+                coEvery { profileService.activateProfile(userId, profileId) } throws
+                        ConflictException(
+                                "Another profile was activated concurrently. Please refresh and try again."
+                        )
+
+                client
+                        .post("/api/v1/users/$userId/profiles/$profileId/activate") {
+                                header(HttpHeaders.Authorization, "Bearer $token")
+                        }
+                        .apply { assertEquals(HttpStatusCode.Conflict, status) }
+        }
+
         // ── Doctor PROPOSED status gate ──────────────────────────────────────────
 
         @Test

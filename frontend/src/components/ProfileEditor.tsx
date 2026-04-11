@@ -54,7 +54,7 @@ const icrSegmentSchema = z.object({
 
 const isfSegmentSchema = z.object({
   startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time (HH:MM)"),
-  value: z.number().min(10.0, "ISF must be >= 10.0 mg/dL").max(200.0, "ISF must be <= 200.0 mg/dL"),
+  value: z.number().min(10.0, "ISF must be >= 10.0 mg/dL/U").max(200.0, "ISF must be <= 200.0 mg/dL/U"),
 });
 
 const targetSegmentSchema = z.object({
@@ -111,6 +111,7 @@ interface ProfileEditorProps {
   userId: string;
   initialProfile?: Profile;
   onProfileSaved?: () => void;
+  readOnly?: boolean;
 }
 
 const generateNextName = (currentName: string) => {
@@ -133,7 +134,7 @@ const getNextTargetSegment = (fields: { startTime: string; low: number; high: nu
   return { startTime: nextTime, low: last.low, high: last.high };
 };
 
-export function ProfileEditor({ userId, initialProfile, onProfileSaved }: ProfileEditorProps) {
+export function ProfileEditor({ userId, initialProfile, onProfileSaved, readOnly = false }: ProfileEditorProps) {
   const { register, control, handleSubmit, setValue, getValues, formState: { errors, isDirty } } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: initialProfile ? {
@@ -230,13 +231,16 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved }: Profil
       console.error(err);
       let errorMessage = "Failed to save profile. Please try again.";
       const data = err.response?.data;
-      if (typeof data === 'string' && data.length > 0) {
+      // Reject HTML responses (e.g. Nginx 502 pages) to prevent XSS
+      const isSafeString = (s: unknown): s is string =>
+        typeof s === 'string' && s.length > 0 && !s.trimStart().startsWith('<');
+      if (isSafeString(data)) {
         errorMessage = data;
-      } else if (typeof data?.message === 'string') {
+      } else if (isSafeString(data?.message)) {
         errorMessage = data.message;
-      } else if (typeof data?.detail === 'string') {
+      } else if (isSafeString(data?.detail)) {
         errorMessage = data.detail;
-      } else if (typeof err.message === 'string') {
+      } else if (isSafeString(err.message)) {
         errorMessage = err.message;
       }
       setApiError(errorMessage);
@@ -251,9 +255,14 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved }: Profil
   return (
     <div className="profile-editor">
       <h3>
-        {initialProfile ? 'Edit Profile' : 'Create Profile'}
-        {isDirty && <span className="unsaved-indicator" aria-live="polite"> — Unsaved changes</span>}
+        {initialProfile ? (readOnly ? 'View Profile' : 'Edit Profile') : 'Create Profile'}
+        {!readOnly && isDirty && <span className="unsaved-indicator" aria-live="polite"> — Unsaved changes</span>}
       </h3>
+      {readOnly && (
+        <div role="status" style={{ marginBottom: '1rem', padding: '0.5rem 1rem', background: '#f0f4ff', border: '1px solid #aac', borderRadius: '6px', fontSize: '0.9rem' }}>
+          Read-only view — you cannot edit this patient's profile directly. Use "Propose Profile for Patient" to suggest a new configuration.
+        </div>
+      )}
       
       {initialProfile && (
         <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px' }}>
@@ -291,7 +300,7 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved }: Profil
                 aria-describedby="insulinType-error"
                 aria-required="true"
               >
-                <option value="">{insulinsLoading ? 'Loading…' : '-- Select Insulin --'}</option>
+                <option value="">{insulinsLoading ? 'Loading insulins…' : insulinsError ? 'Could not load insulins' : '-- Select Insulin --'}</option>
                 {insulins.map((insulin) => (
                   <option key={insulin.id} value={insulin.name}>{insulin.name}</option>
                 ))}
@@ -386,8 +395,8 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved }: Profil
                     aria-label={`Value ${index}`}
                 />
                 <button type="button" onClick={() => removeBasal(index)}>Remove</button>
-                {errors.basal?.[index]?.startTime && <span>Start Time Error</span>}
-                {errors.basal?.[index]?.value && <span>Value Error</span>}
+                {errors.basal?.[index]?.startTime && <span role="alert" className="error-text">{errors.basal[index]?.startTime?.message || "Invalid start time"}</span>}
+                {errors.basal?.[index]?.value && <span role="alert" className="error-text">{errors.basal[index]?.value?.message || "Invalid value"}</span>}
               </div>
             ))}
             <button type="button" onClick={() => appendBasal(getNextSegment(getValues('basal') || basalFields, 0.5))}>Add Segment</button>
@@ -417,8 +426,8 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved }: Profil
                     aria-label={`ICR Value ${index}`}
                 />
                 <button type="button" onClick={() => removeIcr(index)}>Remove</button>
-                {errors.icr?.[index]?.startTime && <span>Start Time Error</span>}
-                {errors.icr?.[index]?.value && <span>{errors.icr[index]?.value?.message || "Value Error"}</span>}
+                {errors.icr?.[index]?.startTime && <span role="alert" className="error-text">{errors.icr[index]?.startTime?.message || "Invalid start time"}</span>}
+                {errors.icr?.[index]?.value && <span role="alert" className="error-text">{errors.icr[index]?.value?.message || "Value Error"}</span>}
               </div>
             ))}
             <button type="button" onClick={() => appendIcr(getNextSegment(getValues('icr') || icrFields, 10.0))}>Add ICR Segment</button>
@@ -448,8 +457,8 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved }: Profil
                     aria-label={`ISF Value ${index}`}
                 />
                 <button type="button" onClick={() => removeIsf(index)}>Remove</button>
-                {errors.isf?.[index]?.startTime && <span>Start Time Error</span>}
-                {errors.isf?.[index]?.value && <span>{errors.isf[index]?.value?.message || "Value Error"}</span>}
+                {errors.isf?.[index]?.startTime && <span role="alert" className="error-text">{errors.isf[index]?.startTime?.message || "Invalid start time"}</span>}
+                {errors.isf?.[index]?.value && <span role="alert" className="error-text">{errors.isf[index]?.value?.message || "Value Error"}</span>}
               </div>
             ))}
             <button type="button" onClick={() => appendIsf(getNextSegment(getValues('isf') || isfFields, 50.0))}>Add ISF Segment</button>
@@ -484,9 +493,9 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved }: Profil
                   aria-label={`Target High ${index}`}
                 />
                 <button type="button" onClick={() => removeTarget(index)}>Remove</button>
-                {errors.targets?.[index]?.startTime && <span>Start Time Error</span>}
-                {errors.targets?.[index]?.low && <span>{errors.targets[index]?.low?.message || "Low Error"}</span>}
-                {errors.targets?.[index]?.high && <span>{errors.targets[index]?.high?.message || "High Error"}</span>}
+                {errors.targets?.[index]?.startTime && <span role="alert" className="error-text">{errors.targets[index]?.startTime?.message || "Invalid start time"}</span>}
+                {errors.targets?.[index]?.low && <span role="alert" className="error-text">{errors.targets[index]?.low?.message || "Low Error"}</span>}
+                {errors.targets?.[index]?.high && <span role="alert" className="error-text">{errors.targets[index]?.high?.message || "High Error"}</span>}
               </div>
             ))}
             <button type="button" onClick={() => appendTarget(getNextTargetSegment(getValues('targets') || targetFields as any))}>Add Target Segment</button>
@@ -494,11 +503,13 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved }: Profil
           </div>
         )}
 
-        <div style={{ marginTop: '20px' }}>
-          <button type="submit" disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'Saving...' : (initialProfile ? 'Update Profile' : 'Create Profile')}
-          </button>
-        </div>
+        {!readOnly && (
+          <div style={{ marginTop: '20px' }}>
+            <button type="submit" disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? 'Saving...' : (initialProfile ? 'Update Profile' : 'Create Profile')}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

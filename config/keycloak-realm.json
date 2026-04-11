@@ -141,7 +141,10 @@
                     "config": {
                         "claim.name": "roles",
                         "jsonType.label": "String",
-                        "multivalued": "true"
+                        "multivalued": "true",
+                        "access.token.claim": "true",
+                        "id.token.claim": "false",
+                        "userinfo.token.claim": "false"
                     }
                 },
                 {
@@ -152,7 +155,10 @@
                         "user.attribute": "allowed_patients",
                         "claim.name": "allowed_patients",
                         "jsonType.label": "String",
-                        "multivalued": "true"
+                        "multivalued": "true",
+                        "access.token.claim": "true",
+                        "id.token.claim": "false",
+                        "userinfo.token.claim": "false"
                     }
                 },
                 {

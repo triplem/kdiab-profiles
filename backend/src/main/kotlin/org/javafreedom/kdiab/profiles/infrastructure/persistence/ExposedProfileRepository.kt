@@ -2,10 +2,13 @@
 @file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 package org.javafreedom.kdiab.profiles.infrastructure.persistence
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.IllegalTimeZoneException
+import kotlinx.datetime.TimeZone
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.javafreedom.kdiab.profiles.domain.model.*
@@ -17,7 +20,8 @@ import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.javatime.timestamp
 import org.jetbrains.exposed.v1.json.jsonb
 import kotlin.time.Instant
-import kotlinx.datetime.TimeZone
+
+private val logger = KotlinLogging.logger {}
 
 @Serializable
 data class ProfileSegments(
@@ -120,6 +124,12 @@ class ExposedProfileRepository(
 
     private fun mapToProfile(row: ResultRow): Profile {
         val pSectors: ProfileSegments = row[Profiles.segments]
+        val timeZone = try {
+            TimeZone.of(row[Profiles.timeZone])
+        } catch (e: IllegalTimeZoneException) {
+            logger.warn(e) { "Unknown timezone '${row[Profiles.timeZone]}' for profile ${row[Profiles.id]}, falling back to UTC" }
+            TimeZone.UTC
+        }
         return Profile(
             id = row[Profiles.id],
             userId = row[Profiles.userId],
@@ -128,7 +138,7 @@ class ExposedProfileRepository(
             insulinType = row[Profiles.insulinType],
             units = row[Profiles.units],
             durationOfAction = row[Profiles.durationOfAction],
-            timeZone = TimeZone.of(row[Profiles.timeZone]),
+            timeZone = timeZone,
             status = row[Profiles.status],
             createdAt = Instant.fromEpochMilliseconds(row[Profiles.createdAt].toEpochMilli()),
             basal = pSectors.basal,
@@ -144,10 +154,6 @@ class ExposedProfileRepository(
                 it[Profiles.status] = ProfileStatus.ARCHIVED
             } > 0
         }
-    }
-
-    override suspend fun deleteAllByUserId(userId: Uuid): Boolean = withContext(ioDispatcher) {
-        suspendTransaction { Profiles.deleteWhere { Profiles.userId eq userId } > 0 }
     }
 
     override suspend fun deleteByUserIdAndStatus(
@@ -173,7 +179,8 @@ class ExposedProfileRepository(
         withContext(ioDispatcher) {
             suspendTransaction {
                 oldActive?.let { updateProfileInTx(it) }
-                updateProfileInTx(newActive)
+                val exists = Profiles.selectAll().where { Profiles.id eq newActive.id }.count() > 0
+                if (exists) updateProfileInTx(newActive) else insertProfileInTx(newActive)
             }
         }
 

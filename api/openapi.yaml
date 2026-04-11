@@ -43,6 +43,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Insulin'
+        '400':
+          description: Invalid name (blank or too long)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Insulin with that name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /insulins/{id}:
     put:
@@ -73,8 +91,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Insulin'
+        '400':
+          description: Invalid name (blank or too long)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Insulin not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Insulin with that name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: Delete a specific insulin
       operationId: deleteInsulin
@@ -88,8 +134,24 @@ paths:
       responses:
         '204':
           description: Insulin deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Insulin not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /users/{userId}/profiles:
     get:
@@ -134,6 +196,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Profile'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
     delete:
       summary: Delete all profiles for a user
@@ -402,15 +482,25 @@ components:
           type: string
         insulinType:
           type: string
+        units:
+          type: string
+          description: Blood glucose unit system used for ISF and target segments
+          enum: [mg/dl, mmol/l]
+          default: mg/dl
         durationOfAction:
           type: integer
           description: Duration of insulin action in minutes
+        timeZone:
+          type: string
+          description: IANA timezone identifier for segment times (e.g. "Europe/Berlin")
+          example: UTC
         status:
           type: string
           enum: [ACTIVE, ARCHIVED, DRAFT, PROPOSED]
         createdAt:
           type: string
           format: date-time
+          nullable: true
         basal:
           type: array
           items:
@@ -532,6 +622,20 @@ components:
       required:
         - id
         - name
+
+    ErrorResponse:
+      type: object
+      description: Standard error envelope returned by all error responses
+      properties:
+        code:
+          type: integer
+          description: HTTP status code
+        message:
+          type: string
+          description: Human-readable error description
+      required:
+        - code
+        - message
 
   securitySchemes:
     bearerAuth:

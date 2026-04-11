@@ -104,6 +104,68 @@ class ProfileRepositoryTest {
         assertEquals(ProfileStatus.ACTIVE, retrieved.status)
     }
 
+    // ── activateProfile: DRAFT→ACTIVE (existing row → update) ─────────────────
+    @Test
+    fun `activateProfile should activate a DRAFT profile via update`() = runBlocking {
+        val userId = Uuid.random()
+        val draft = createTestProfile(userId = userId, status = ProfileStatus.DRAFT)
+        repository.save(draft)
+
+        val toActivate = draft.copy(status = ProfileStatus.ACTIVE)
+        val result = repository.activateProfile(null, toActivate)
+
+        assertEquals(ProfileStatus.ACTIVE, result.status)
+        val retrieved = repository.findById(draft.id)
+        assertNotNull(retrieved)
+        assertEquals(ProfileStatus.ACTIVE, retrieved.status)
+    }
+
+    // ── activateProfile: ARCHIVED→ACTIVE clone (new UUID → insert) ────────────
+    @Test
+    fun `activateProfile should insert a cloned ARCHIVED profile with new id`() = runBlocking {
+        val userId = Uuid.random()
+        val archived = createTestProfile(userId = userId, status = ProfileStatus.ARCHIVED)
+        repository.save(archived)
+
+        // Simulate the service's copy: brand-new UUID, pointing back to archived
+        val cloned = archived.copy(
+            id = Uuid.random(),
+            status = ProfileStatus.ACTIVE,
+            previousProfileId = archived.id
+        )
+        val result = repository.activateProfile(null, cloned)
+
+        assertEquals(cloned.id, result.id)
+        assertEquals(ProfileStatus.ACTIVE, result.status)
+        val retrieved = repository.findById(cloned.id)
+        assertNotNull(retrieved)
+        assertEquals(archived.id, retrieved.previousProfileId)
+        // Original archived record must still exist
+        val originalStillExists = repository.findById(archived.id)
+        assertNotNull(originalStillExists)
+        assertEquals(ProfileStatus.ARCHIVED, originalStillExists.status)
+    }
+
+    // ── activateProfile: archives old active, inserts new ─────────────────────
+    @Test
+    fun `activateProfile should archive old active when activating a new profile`() = runBlocking {
+        val userId = Uuid.random()
+        val currentActive = createTestProfile(userId = userId, name = "Current", status = ProfileStatus.ACTIVE)
+        val draft = createTestProfile(userId = userId, name = "New", status = ProfileStatus.DRAFT)
+        repository.save(currentActive)
+        repository.save(draft)
+
+        val oldArchived = currentActive.copy(status = ProfileStatus.ARCHIVED)
+        val newActive = draft.copy(status = ProfileStatus.ACTIVE)
+        repository.activateProfile(oldArchived, newActive)
+
+        assertEquals(ProfileStatus.ARCHIVED, repository.findById(currentActive.id)?.status)
+        assertEquals(ProfileStatus.ACTIVE, repository.findById(draft.id)?.status)
+        assertEquals(null, repository.findActiveByUserId(userId)?.let {
+            if (it.id == currentActive.id) "old still active" else null
+        })
+    }
+
     private fun createTestProfile(
         userId: Uuid = Uuid.random(),
         name: String = "Test Profile",

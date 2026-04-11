@@ -8,11 +8,19 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
+import org.javafreedom.kdiab.profiles.domain.exception.ConflictException
 import org.javafreedom.kdiab.profiles.domain.repository.InsulinRepository
+import org.javafreedom.kdiab.profiles.plugins.ErrorResponse
 import org.javafreedom.kdiab.profiles.plugins.UserPrincipal
 import kotlin.uuid.Uuid
 import org.javafreedom.kdiab.profiles.api.models.Insulin as ApiInsulin
 import org.javafreedom.kdiab.profiles.domain.model.Insulin as DomainInsulin
+
+private const val INSULIN_NAME_MAX_LENGTH = 255
+private const val DUPLICATE_INSULIN_MSG = "An insulin with that name already exists"
+private const val INVALID_NAME_MSG = "Insulin name must be 1–255 characters"
+
+private fun isValidInsulinName(name: String) = name.isNotBlank() && name.length <= INSULIN_NAME_MAX_LENGTH
 
 @Serializable
 data class InsulinRequest(val name: String)
@@ -27,8 +35,19 @@ fun Route.insulinRoutes(repository: InsulinRepository) {
 
             post {
                 val request = call.receive<InsulinRequest>()
-                val newInsulin = repository.create(request.name).toApi()
-                call.respond(HttpStatusCode.Created, newInsulin)
+                if (!isValidInsulinName(request.name)) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse(HttpStatusCode.BadRequest.value, INVALID_NAME_MSG)
+                    )
+                    return@post
+                }
+                try {
+                    val newInsulin = repository.create(request.name).toApi()
+                    call.respond(HttpStatusCode.Created, newInsulin)
+                } catch (e: org.jetbrains.exposed.v1.exceptions.ExposedSQLException) {
+                    throw ConflictException(DUPLICATE_INSULIN_MSG, e)
+                }
             }
 
             route("/{id}") {
@@ -45,7 +64,18 @@ fun Route.insulinRoutes(repository: InsulinRepository) {
                     }
                     val id = Uuid.parse(idString)
                     val request = call.receive<InsulinRequest>()
-                    val updated = repository.update(id, request.name)?.toApi()
+                    if (!isValidInsulinName(request.name)) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            ErrorResponse(HttpStatusCode.BadRequest.value, INVALID_NAME_MSG)
+                        )
+                        return@put
+                    }
+                    val updated = try {
+                        repository.update(id, request.name)?.toApi()
+                    } catch (e: org.jetbrains.exposed.v1.exceptions.ExposedSQLException) {
+                        throw ConflictException(DUPLICATE_INSULIN_MSG, e)
+                    }
                     if (updated != null) {
                         call.respond(HttpStatusCode.OK, updated)
                     } else {

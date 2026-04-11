@@ -15,8 +15,6 @@ enum class ProfileStatus {
         PROPOSED
 }
 
-// Keep a simple typealias or extension for now if we want uuid generation convenience?
-// kotlin.uuid.Uuid.random() exists.
 
 @Serializable
 data class Profile(
@@ -27,7 +25,7 @@ data class Profile(
         val insulinType: String,
         val units: String = "mg/dl",
         val durationOfAction: Int, // in minutes
-        val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+        val timeZone: TimeZone = TimeZone.UTC,
         val status: ProfileStatus,
         val createdAt: Instant = Clock.System.now(),
         val basal: List<BasalSegment>,

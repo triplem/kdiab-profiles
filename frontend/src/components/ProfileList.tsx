@@ -7,12 +7,14 @@ import { useTimeFormat } from '../context/TimeFormatContext';
 interface ProfileListProps {
   userId: string;
   onSelectProfile?: (profile: Profile) => void;
+  readOnly?: boolean;
 }
 
-export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
+export function ProfileList({ userId, onSelectProfile, readOnly = false }: ProfileListProps) {
   const queryClient = useQueryClient();
   const [expandedProfileId, setExpandedProfileId] = React.useState<string | null>(null);
-  const { formatDate } = useTimeFormat();
+  const [mutationError, setMutationError] = React.useState<string | null>(null);
+  const { formatDate, formatTime } = useTimeFormat();
 
   const { data: profiles = [] as Profile[], isLoading, isError, error } = useQuery<Profile[]>({
     queryKey: ['profiles', userId],
@@ -23,24 +25,36 @@ export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
     enabled: !!userId,
   });
 
+  const onMutationError = (err: unknown) => {
+    const msg = (err as any)?.response?.data?.message
+      || (err as any)?.message
+      || 'Operation failed. Please try again.';
+    setMutationError(msg);
+  };
+
   const acceptMutation = useMutation({
     mutationFn: (profileId: string) => customApi.acceptProposedProfile(userId, profileId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profiles', userId] }),
+    onSuccess: () => { setMutationError(null); queryClient.invalidateQueries({ queryKey: ['profiles', userId] }); },
+    onError: onMutationError,
   });
 
   const rejectMutation = useMutation({
     mutationFn: (profileId: string) => customApi.rejectProposedProfile(userId, profileId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profiles', userId] }),
+    onSuccess: () => { setMutationError(null); queryClient.invalidateQueries({ queryKey: ['profiles', userId] }); },
+    onError: onMutationError,
   });
 
   const activateMutation = useMutation({
     mutationFn: (profileId: string) => api.activateProfile(userId, profileId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profiles', userId] }),
+    onSuccess: () => { setMutationError(null); queryClient.invalidateQueries({ queryKey: ['profiles', userId] }); },
+    onError: onMutationError,
   });
 
   const handleAccept = (e: React.MouseEvent, profileId: string) => {
     e.stopPropagation();
-    acceptMutation.mutate(profileId);
+    if (window.confirm('Accepting this proposal will replace your current active configuration. Continue?')) {
+      acceptMutation.mutate(profileId);
+    }
   };
 
   const handleReject = (e: React.MouseEvent, profileId: string) => {
@@ -76,16 +90,18 @@ export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
       }}>
         {isActive && <div className="active-glow" />}
         <div className="profile-card-header">
-          <strong>{profile.name}</strong>
+          <strong>{profile.name}{isActive && <span className="active-label" aria-label="Currently active profile"> ✓ Active</span>}</strong>
           <div>
             <span className={`status-badge status-${(profile.status as string || 'Unknown').toLowerCase()}`}>{profile.status as string || 'Unknown'}</span>
-            <button 
-              onClick={(e) => { e.stopPropagation(); onSelectProfile?.(profile); }}
-              className="btn small"
-            >
-              Edit
-            </button>
-            {profile.status !== 'ACTIVE' && profile.status !== 'PROPOSED' && (
+            {!readOnly && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onSelectProfile?.(profile); }}
+                className="btn small"
+              >
+                Edit
+              </button>
+            )}
+            {!readOnly && profile.status !== 'ACTIVE' && profile.status !== 'PROPOSED' && (
               <button
                 onClick={(e) => handleActivate(e, profile.id)}
                 className="btn primary small"
@@ -108,7 +124,7 @@ export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
                 <div className="detail-section">
                   <h4>Basal Segments</h4>
                   <ul>
-                    {profile.basal.map((b, i) => <li key={i}>{b?.startTime} - {b?.value} U/hr</li>)}
+                    {profile.basal.map((b, i) => <li key={i}>{formatTime(b?.startTime || '00:00')} - {b?.value} U/hr</li>)}
                   </ul>
                 </div>
               )}
@@ -116,7 +132,7 @@ export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
                 <div className="detail-section">
                   <h4>ICR Segments</h4>
                   <ul>
-                    {profile.icr.map((icr, i) => <li key={i}>{icr?.startTime} - {icr?.value} g/U</li>)}
+                    {profile.icr.map((icr, i) => <li key={i}>{formatTime(icr?.startTime || '00:00')} - {icr?.value} g/U</li>)}
                   </ul>
                 </div>
               )}
@@ -124,7 +140,7 @@ export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
                 <div className="detail-section">
                   <h4>ISF Segments</h4>
                   <ul>
-                    {profile.isf.map((isf, i) => <li key={i}>{isf?.startTime} - {isf?.value} mg/dL</li>)}
+                    {profile.isf.map((isf, i) => <li key={i}>{formatTime(isf?.startTime || '00:00')} - {isf?.value} mg/dL</li>)}
                   </ul>
                 </div>
               )}
@@ -132,14 +148,14 @@ export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
                 <div className="detail-section">
                   <h4>BG Targets</h4>
                   <ul>
-                    {profile.targets.map((t, i) => <li key={i}>{t?.startTime} - {t?.low}–{t?.high} mg/dL</li>)}
+                    {profile.targets.map((t, i) => <li key={i}>{formatTime(t?.startTime || '00:00')} - {t?.low}–{t?.high} mg/dL</li>)}
                   </ul>
                 </div>
               )}
             </div>
           )}
         </div>
-        {(profile.status as string) === 'PROPOSED' && (
+        {(profile.status as string) === 'PROPOSED' && !readOnly && (
           <div className="proposal-actions">
             {profile.createdAt && (
               <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', width: '100%' }}>
@@ -171,6 +187,11 @@ export function ProfileList({ userId, onSelectProfile }: ProfileListProps) {
   return (
     <div className="profile-list">
       <h2>Profiles</h2>
+      {mutationError && (
+        <div role="alert" className="error" style={{ marginBottom: '1rem' }}>
+          {mutationError}
+        </div>
+      )}
       {profiles.length === 0 ? (
         <p>No profiles found.</p>
       ) : (

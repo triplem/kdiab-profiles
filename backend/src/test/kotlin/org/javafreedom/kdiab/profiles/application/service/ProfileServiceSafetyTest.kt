@@ -23,14 +23,9 @@ class ProfileServiceSafetyTest {
 
         service.deleteAllProfiles(userId)
 
-        // Verify it calls deleteByUserIdAndStatus with DRAFT
-        coVerify(exactly = 1) { 
-            repository.deleteByUserIdAndStatus(userId, ProfileStatus.DRAFT) 
-        }
-
-        // Verify it DOES NOT call deleteAllByUserId
-        coVerify(exactly = 0) { 
-            repository.deleteAllByUserId(any()) 
+        // Verify it only calls deleteByUserIdAndStatus with DRAFT status
+        coVerify(exactly = 1) {
+            repository.deleteByUserIdAndStatus(userId, ProfileStatus.DRAFT)
         }
     }
 }

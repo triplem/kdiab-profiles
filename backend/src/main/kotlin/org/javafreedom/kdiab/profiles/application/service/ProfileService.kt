@@ -6,6 +6,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.LocalTime
 import org.javafreedom.kdiab.profiles.domain.model.Profile
+import org.javafreedom.kdiab.profiles.domain.exception.ConflictException
 import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
 import org.javafreedom.kdiab.profiles.domain.repository.ProfileRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -52,11 +53,21 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                         profile.copy(status = ProfileStatus.ACTIVE)
                 }
 
-                // Atomic activation (archives old if exists, activates new)
+                // Atomic activation (archives old if exists, activates new).
+                // The DB enforces IDX_PROFILES_USER_ACTIVE (unique partial index on ACTIVE per user).
+                // If two concurrent requests race here, the second will hit the constraint and we
+                // surface that as a 409 Conflict rather than a raw 500.
                 val currentActive = profileRepository.findActiveByUserId(userId)
                 val oldActive = currentActive?.copy(status = ProfileStatus.ARCHIVED)
 
-                return profileRepository.activateProfile(oldActive, profileToActivate)
+                return try {
+                        profileRepository.activateProfile(oldActive, profileToActivate)
+                } catch (e: org.jetbrains.exposed.v1.exceptions.ExposedSQLException) {
+                        logger.warn(e) { "Concurrent activation conflict for user $userId" }
+                        throw ConflictException(
+                                "Another profile was activated concurrently. Please refresh and try again."
+                        )
+                }
         }
 
         suspend fun acceptProposedProfile(userId: Uuid, profileId: Uuid): Profile {
@@ -68,11 +79,20 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                                 .BusinessValidationException("Only PROPOSED profiles can be accepted")
                 }
 
+                profile.validate()
+
                 val currentActive = profileRepository.findActiveByUserId(userId)
                 val oldActive = currentActive?.copy(status = ProfileStatus.ARCHIVED)
                 val newActive = profile.copy(status = ProfileStatus.ACTIVE)
 
-                return profileRepository.activateProfile(oldActive, newActive)
+                return try {
+                        profileRepository.activateProfile(oldActive, newActive)
+                } catch (e: org.jetbrains.exposed.v1.exceptions.ExposedSQLException) {
+                        logger.warn(e) { "Concurrent activation conflict accepting proposal for user $userId" }
+                        throw ConflictException(
+                                "Another profile was activated concurrently. Please refresh and try again."
+                        )
+                }
         }
 
         suspend fun rejectProposedProfile(userId: Uuid, profileId: Uuid): Profile {
@@ -95,6 +115,13 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                 if (existing.status == ProfileStatus.ARCHIVED) {
                         throw org.javafreedom.kdiab.profiles.domain.exception
                                 .BusinessValidationException("Cannot update an archived profile")
+                }
+
+                if (existing.status == ProfileStatus.PROPOSED) {
+                        throw org.javafreedom.kdiab.profiles.domain.exception
+                                .BusinessValidationException(
+                                        "Cannot directly update a proposed profile — use accept or reject"
+                                )
                 }
 
                 if (existing.status == ProfileStatus.ACTIVE) {
@@ -153,6 +180,14 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                                 )
                 }
 
+                val originalSize = when (segmentType.lowercase()) {
+                        "basal" -> profile.basal.size
+                        "icr" -> profile.icr.size
+                        "isf" -> profile.isf.size
+                        "targets" -> profile.targets.size
+                        else -> throw IllegalArgumentException("Unknown segment type: $segmentType")
+                }
+
                 val updatedProfile =
                         when (segmentType.lowercase()) {
                                 "basal" ->
@@ -188,6 +223,22 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                                                 "Unknown segment type: $segmentType"
                                         )
                         }
+
+                val newSize = when (segmentType.lowercase()) {
+                        "basal" -> updatedProfile.basal.size
+                        "icr" -> updatedProfile.icr.size
+                        "isf" -> updatedProfile.isf.size
+                        else -> updatedProfile.targets.size
+                }
+
+                if (newSize == originalSize) {
+                        throw org.javafreedom.kdiab.profiles.domain.exception
+                                .BusinessValidationException(
+                                        "No $segmentType segment found at $startTime"
+                                )
+                }
+
+                updatedProfile.validate()
 
                 if (profile.status == ProfileStatus.ACTIVE) {
                         // Copy-on-Write: Archive existing, save new active version

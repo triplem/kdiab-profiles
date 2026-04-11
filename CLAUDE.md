@@ -121,6 +121,7 @@ plugins/                # Ktor plugin config (Security, Logging, StatusPages)
 **Authentication**: JWT validation against Keycloak. Roles (`PATIENT`, `DOCTOR`, `ADMIN`) come from Keycloak `realm_access.roles`.
 
 **Database**: PostgreSQL via Exposed ORM + HikariCP. Schema migrations via Liquibase. Integration tests use H2 in-memory.
+> **PostgreSQL is required for production.** The `IDX_PROFILES_USER_ACTIVE` partial index (`WHERE status = 'ACTIVE'`) enforcing one active profile per user is defined with `dbms: postgresql` in the Liquibase changeset and is not created in H2. Switching to another database engine would lose this constraint.
 
 ### Frontend (React + React Query)
 

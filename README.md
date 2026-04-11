@@ -5,6 +5,8 @@
 -   Docker and Docker Compose
 -   OR Podman and podman-compose
 
+> **Database requirement**: The application enforces a partial unique index (`IDX_PROFILES_USER_ACTIVE`) that allows only one active profile per user. This index uses PostgreSQL-specific syntax (`WHERE status = 'ACTIVE'`) and is **not** applied to H2 (used in integration tests). **PostgreSQL is required for production deployments.** The provided `docker-compose.yml` already uses PostgreSQL.
+
 ## Quick Start
 
 To start the full application (Backend + Frontend + Database + Keycloak), run:
@@ -35,6 +37,32 @@ The application is pre-configured with several test accounts in Keycloak. The pa
 | `dr_house` | `DOCTOR` | Doctor (Allowed patients: sarah) |
 | `dr_cameron` | `DOCTOR` | Doctor (Allowed patients: mike) |
 | `admin` | `ADMIN` | Super Administrator |
+
+## Production Configuration
+
+The frontend container is environment-agnostic: no URLs are baked into the image. Nginx resolves the following variables at container startup via `envsubst`:
+
+| Variable | Description | Default (local dev) |
+| ---- | ---- | ---- |
+| `KEYCLOAK_URL` | **Browser-facing** Keycloak origin. Included in the `Content-Security-Policy connect-src` directive so the OIDC client can reach the Identity Provider. Must be the URL the end-user's browser uses — not an internal service name. | `http://localhost:8081` |
+| `BACKEND_URL` | Internal address nginx uses to proxy `/api/*` to the backend. Never exposed to the browser. | `http://backend:8080` |
+
+Example production override:
+
+```bash
+KEYCLOAK_URL=https://auth.example.com \
+BACKEND_URL=http://backend-service:8080 \
+docker-compose up
+```
+
+Or via a `.env` file in the repository root:
+
+```
+KEYCLOAK_URL=https://auth.example.com
+BACKEND_URL=http://backend-service:8080
+```
+
+> **Note**: Setting `KEYCLOAK_URL` incorrectly will cause the OIDC login flow to fail with a Content Security Policy violation in the browser console.
 
 ## Development Setup
 

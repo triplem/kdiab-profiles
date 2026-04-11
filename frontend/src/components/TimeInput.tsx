@@ -18,7 +18,7 @@ export const TimeInput = forwardRef<HTMLDivElement, TimeInputProps>(
     const [hStr, mStr] = timeVal.split(':');
     let h = parseInt(hStr, 10);
     if (isNaN(h)) h = 0;
-    const m = mStr || '00';
+    const m = (mStr || '00').padStart(2, '0');
 
     const isPM = h >= 12;
     const displayH = is24Hour ? h : (h % 12 || 12);
@@ -52,8 +52,8 @@ export const TimeInput = forwardRef<HTMLDivElement, TimeInputProps>(
     const handleAmPmChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const newIsPM = e.target.value === 'PM';
       let newH = h;
-      if (newIsPM && !isPM) newH = (h + 12) % 24;
-      if (!newIsPM && isPM) newH = (h - 12) % 24;
+      if (newIsPM && !isPM) newH = h === 0 ? 12 : h + 12;
+      if (!newIsPM && isPM) newH = h === 12 ? 0 : h - 12;
       const hh = String(newH).padStart(2, '0');
       triggerChange(hh, m);
     };

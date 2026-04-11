@@ -15,6 +15,8 @@ We will implement a **Global Exception Handling** mechanism using Ktor's `Status
     *   `AuthorizationException` -> `403 Forbidden`
     *   `NotFoundException` -> `404 Not Found`
     *   `IllegalArgumentException` / `ValidationException` -> `400 Bad Request`
+    *   `ConflictException` -> `409 Conflict`
+    *   `ExposedSQLException` with SQL state `23505` (UNIQUE VIOLATION) -> `409 Conflict` with a human-readable message identifying the violated constraint (e.g. "already has an active profile"). Non-23505 `ExposedSQLException` falls through to 500.
     *   Any other `Exception` -> `500 Internal Server Error`
 3.  **Standardized Error Response**: The API will return a standard JSON error response format (e.g., `{ "error": "code", "message": "description" }`).
 

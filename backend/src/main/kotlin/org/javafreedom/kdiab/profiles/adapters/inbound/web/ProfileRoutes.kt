@@ -93,13 +93,29 @@ private fun Route.createProfile(profileService: ProfileService) {
 
         checkReadAccess(principal, targetUserId)
 
-        val status = if (principal?.isDoctor() == true &&
-                principal.userId != targetUserId &&
-                principal.allowedPatients.contains(targetUserId)) {
-            org.javafreedom.kdiab.profiles.domain.model.ProfileStatus.PROPOSED
-        } else {
-            checkWriteAccess(principal, targetUserId)
-            org.javafreedom.kdiab.profiles.domain.model.ProfileStatus.DRAFT
+        // Doctor role takes precedence: allowedPatients is always enforced even for admin-doctors.
+        val status = when {
+            principal?.userId == targetUserId -> {
+                // User creating for themselves — standard write access
+                checkWriteAccess(principal, targetUserId)
+                org.javafreedom.kdiab.profiles.domain.model.ProfileStatus.DRAFT
+            }
+            principal?.isDoctor() == true -> {
+                // Doctor acting for another user — must be in allowedPatients regardless of other roles
+                if (!principal.allowedPatients.contains(targetUserId)) {
+                    throw org.javafreedom.kdiab.profiles.domain.exception
+                        .AuthorizationException("Write Access Denied")
+                }
+                org.javafreedom.kdiab.profiles.domain.model.ProfileStatus.PROPOSED
+            }
+            principal?.isAdmin() == true -> {
+                // Pure admin (not a doctor) acting for a user — allowed, creates DRAFT
+                org.javafreedom.kdiab.profiles.domain.model.ProfileStatus.DRAFT
+            }
+            else -> {
+                checkWriteAccess(principal, targetUserId)
+                org.javafreedom.kdiab.profiles.domain.model.ProfileStatus.DRAFT
+            }
         }
 
         val request = call.receive<CreateProfileRequest>()
@@ -121,10 +137,15 @@ private fun Route.updateProfile(profileService: ProfileService) {
         val request = call.receive<org.javafreedom.kdiab.profiles.api.models.Profile>()
         val domainProfile = request.toDomain()
 
-        // Ensure the ID matches the path
+        // Ensure both the ID and the userId in the body match the path parameters
         if (domainProfile.id != profileId) {
             throw org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException(
                     "Profile ID mismatch"
+            )
+        }
+        if (domainProfile.userId != targetUserId) {
+            throw org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException(
+                    "Profile userId does not match URL"
             )
         }
 
@@ -216,14 +237,9 @@ private fun Route.deleteAllProfiles(profileService: ProfileService) {
 
         checkWriteAccess(principal, targetUserId)
 
-        val deleted = profileService.deleteAllProfiles(targetUserId)
-        if (deleted) {
-            call.respond(HttpStatusCode.NoContent)
-        } else {
-            throw org.javafreedom.kdiab.profiles.domain.exception.ResourceNotFoundException(
-                    "Profiles not found"
-            )
-        }
+        // Idempotent: deleting when no drafts exist is still a success
+        profileService.deleteAllProfiles(targetUserId)
+        call.respond(HttpStatusCode.NoContent)
     }
 }
 
@@ -232,6 +248,12 @@ private fun checkReadAccess(
         targetUserId: Uuid
 ) {
     if (principal == null || !principal.canAccess(targetUserId)) {
+        logger.warn {
+            "Read access denied: principalId=${principal?.userId} " +
+            "roles=${principal?.roles} " +
+            "allowedPatients=${principal?.allowedPatients} " +
+            "targetUserId=$targetUserId"
+        }
         throw org.javafreedom.kdiab.profiles.domain.exception.AuthorizationException(
                 "Access Not Authorized"
         )
@@ -243,6 +265,12 @@ private fun checkWriteAccess(
         targetUserId: Uuid
 ) {
     if (principal == null || (principal.userId != targetUserId && !principal.isAdmin())) {
+        logger.warn {
+            "Write access denied: principalId=${principal?.userId} " +
+            "roles=${principal?.roles} " +
+            "allowedPatients=${principal?.allowedPatients} " +
+            "targetUserId=$targetUserId"
+        }
         throw org.javafreedom.kdiab.profiles.domain.exception.AuthorizationException(
                 "Write Access Denied"
         )

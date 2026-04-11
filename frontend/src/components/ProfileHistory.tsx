@@ -101,6 +101,7 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelect
   const [history, setHistory] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeProfileWarning, setActiveProfileWarning] = useState<string | null>(null);
   const { formatTime, is24Hour } = useTimeFormat();
   
   // Default to last 30 days, properly formatted as 'YYYY-MM-DD'
@@ -115,6 +116,7 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelect
     const fetchHistory = async () => {
       setLoading(true);
       setError(null);
+      setActiveProfileWarning(null);
       try {
         // Parse the input dates to local midnight, then get explicit start/end of day
         // This is much safer than `fromDate.setHours(...)` which can cause off-by-one
@@ -133,16 +135,18 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelect
         
         try {
           const profilesRes = await api.listProfiles(userId);
-          const activeProfile = profilesRes.data.find(p => p.status === 'ACTIVE');
-          
+          // Only prepend the ACTIVE profile — PROPOSED/DRAFT are not part of the historical record
+          const activeProfile = profilesRes.data.find(p => (p.status as string) === 'ACTIVE');
+
           if (activeProfile && !historyRes.data.find(p => p.id === activeProfile.id)) {
             setHistory([activeProfile, ...historyRes.data]);
           } else {
             setHistory(historyRes.data);
           }
         } catch (e) {
-          // Fallback if listProfiles fails
+          // Fallback if listProfiles fails — show history without active profile prepended
           setHistory(historyRes.data);
+          setActiveProfileWarning('Could not load active profile — history may be incomplete.');
         }
       } catch (err) {
         console.error(err);
@@ -153,7 +157,12 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelect
     };
 
     if (userId && startDate && endDate) {
-        fetchHistory();
+      if (startDate > endDate) {
+        setError('Start date must be before end date');
+        setLoading(false);
+        return;
+      }
+      fetchHistory();
     }
   }, [userId, startDate, endDate]);
 
@@ -184,6 +193,7 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelect
 
       {loading && <div>Loading history...</div>}
       {error && <div style={{ color: 'red' }}>{error}</div>}
+      {activeProfileWarning && <div style={{ color: 'orange' }}>{activeProfileWarning}</div>}
 
       {!loading && !error && history.length === 0 ? (
         <p>No history found for this period.</p>

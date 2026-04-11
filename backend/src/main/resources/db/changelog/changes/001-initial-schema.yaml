@@ -66,9 +66,13 @@ databaseChangeLog:
                   constraints:
                     nullable: false
 
+  # Partial unique index — one ACTIVE profile per user.
+  # Restricted to PostgreSQL because H2 (used in integration tests) does not support
+  # conditional/partial indexes. PostgreSQL is required for production deployments.
   - changeSet:
       id: 2
       author: javafreedom
+      dbms: postgresql
       changes:
         - createIndex:
             tableName: profiles
@@ -77,7 +81,9 @@ databaseChangeLog:
               - column:
                   name: user_id
             unique: true
-            where: status = 'ACTIVE'
+      modifySql:
+        - append:
+            value: " WHERE status = 'ACTIVE'"
 
   - changeSet:
       id: 3

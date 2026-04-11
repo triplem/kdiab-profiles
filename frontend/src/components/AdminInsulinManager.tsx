@@ -12,6 +12,14 @@ export const AdminInsulinManager: React.FC<AdminInsulinManagerProps> = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState<string>('');
   const [newName, setNewName] = useState<string>('');
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const onMutationError = (err: unknown) => {
+    const msg = (err as any)?.response?.data?.message
+      || (err as any)?.message
+      || 'Operation failed. Please try again.';
+    setMutationError(msg);
+  };
 
   const { data: insulins = [], isLoading, error } = useQuery<Insulin[]>({
     queryKey: ['insulins-admin'],
@@ -21,28 +29,34 @@ export const AdminInsulinManager: React.FC<AdminInsulinManagerProps> = () => {
   const createMutation = useMutation({
     mutationFn: (name: string) => api.createInsulin({ name }),
     onSuccess: () => {
+      setMutationError(null);
       queryClient.invalidateQueries({ queryKey: ['insulins-admin'] });
       queryClient.invalidateQueries({ queryKey: ['insulins'] });
       setNewName('');
     },
+    onError: onMutationError,
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, name }: { id: string, name: string }) => api.updateInsulin(id, { name }),
     onSuccess: () => {
+      setMutationError(null);
       queryClient.invalidateQueries({ queryKey: ['insulins-admin'] });
       queryClient.invalidateQueries({ queryKey: ['insulins'] });
       setEditingId(null);
       setEditName('');
     },
+    onError: onMutationError,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.deleteInsulin(id),
     onSuccess: () => {
+      setMutationError(null);
       queryClient.invalidateQueries({ queryKey: ['insulins-admin'] });
       queryClient.invalidateQueries({ queryKey: ['insulins'] });
     },
+    onError: onMutationError,
   });
 
   if (isLoading) return <div>Loading insulins...</div>;
@@ -51,6 +65,11 @@ export const AdminInsulinManager: React.FC<AdminInsulinManagerProps> = () => {
   return (
     <div className="admin-container" style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', border: '1px solid var(--border-color, #444)', borderRadius: '8px' }}>
       <h2>Manage Global Insulins</h2>
+      {mutationError && (
+        <div role="alert" className="error" style={{ marginBottom: '1rem' }}>
+          {mutationError}
+        </div>
+      )}
       <p style={{ fontSize: '0.9rem', color: 'var(--text-color, #ccc)', marginBottom: '20px' }}>
         Renaming or deleting insulins only affects the autocomplete list for <b>new</b> profiles. Users' existing profiles are never modified by these changes.
       </p>

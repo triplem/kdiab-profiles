@@ -42,6 +42,81 @@ class InsulinApiTest {
         application { module(insulinRepository = repo, initDatabase = false) }
     }
 
+    // ── POST: blank name → 400 ───────────────────────────────────────────────
+    @Test
+    fun `POST insulin returns 400 for blank name`() = testApplication {
+        val repo = mockk<InsulinRepository>()
+        setupApp(repo)
+
+        val client = createClient { install(ContentNegotiation) { json() } }
+        val response = client.post("/api/v1/insulins") {
+            header(HttpHeaders.Authorization, "Bearer ${generateToken(Role.PATIENT)}")
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"   "}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        coVerify(exactly = 0) { repo.create(any()) }
+    }
+
+    // ── POST: duplicate name → 409 ───────────────────────────────────────────
+    // The route wraps ExposedSQLException in ConflictException; we verify the 409 mapping
+    // by injecting a ConflictException directly (avoids StackOverflow from the relaxed mock
+    // during logger serialisation, since ExposedSQLException holds live DB state).
+    @Test
+    fun `POST insulin returns 409 when a ConflictException is raised`() = testApplication {
+        val repo = mockk<InsulinRepository>()
+        coEvery { repo.create("Fiasp") } throws
+            org.javafreedom.kdiab.profiles.domain.exception.ConflictException(
+                "An insulin with that name already exists"
+            )
+        setupApp(repo)
+
+        val client = createClient { install(ContentNegotiation) { json() } }
+        val response = client.post("/api/v1/insulins") {
+            header(HttpHeaders.Authorization, "Bearer ${generateToken(Role.PATIENT)}")
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"Fiasp"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, response.status)
+    }
+
+    // ── PUT: blank name → 400 ────────────────────────────────────────────────
+    @Test
+    fun `PUT insulin returns 400 for blank name`() = testApplication {
+        val repo = mockk<InsulinRepository>()
+        setupApp(repo)
+
+        val client = createClient { install(ContentNegotiation) { json() } }
+        val id = Uuid.random()
+        val response = client.put("/api/v1/insulins/$id") {
+            header(HttpHeaders.Authorization, "Bearer ${generateToken(Role.ADMIN)}")
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":""}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        coVerify(exactly = 0) { repo.update(any(), any()) }
+    }
+
+    // ── PUT: duplicate name → 409 ────────────────────────────────────────────────
+    @Test
+    fun `PUT insulin returns 409 when a ConflictException is raised`() = testApplication {
+        val repo = mockk<InsulinRepository>()
+        val id = Uuid.random()
+        coEvery { repo.update(id, "Fiasp") } throws
+            org.javafreedom.kdiab.profiles.domain.exception.ConflictException(
+                "An insulin with that name already exists"
+            )
+        setupApp(repo)
+
+        val client = createClient { install(ContentNegotiation) { json() } }
+        val response = client.put("/api/v1/insulins/$id") {
+            header(HttpHeaders.Authorization, "Bearer ${generateToken(Role.ADMIN)}")
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"Fiasp"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, response.status)
+    }
+
     // ── GET: any authenticated user can list insulins ──────────────────────────
 
     @Test

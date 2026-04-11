@@ -17,13 +17,21 @@ vi.mock('../api/client', () => ({
     createProfile: vi.fn(),
     getProfileHistory: vi.fn(),
   },
+  customApi: {
+    acceptProposedProfile: vi.fn(),
+    rejectProposedProfile: vi.fn(),
+  },
+  axiosInstance: { interceptors: { request: { handlers: [] }, response: { handlers: [] } } },
 }));
 
-test('renders main heading', async () => {
-  // Mock listProfiles to return empty list or promise that doesn't resolve immediately
-  // to avoid "act" warnings if possible, though mostly harmless here.
-  (api.listProfiles as any).mockResolvedValue({ data: [] });
+// Build a minimal JWT with the given payload (no real signing — just for decoding in the browser)
+function buildFakeJwt(payload: Record<string, unknown>): string {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = btoa(JSON.stringify(payload));
+  return `${header}.${body}.fakesig`;
+}
 
+function renderApp(userOverrides: Record<string, unknown> = {}) {
   (useAuth as any).mockReturnValue({
     isLoading: false,
     error: null,
@@ -31,25 +39,85 @@ test('renders main heading', async () => {
     user: {
       profile: {
         sub: '11111111-1111-1111-1111-111111111111',
-        name: 'Sarah Patient',
-        preferred_username: 'sarah'
-      }
+        preferred_username: 'sarah',
+      },
+      access_token: buildFakeJwt({ roles: [] }),
+      ...userOverrides,
     },
     signinRedirect: vi.fn(),
-    removeUser: vi.fn()
+    removeUser: vi.fn(),
+    signoutRedirect: vi.fn(),
   });
-
-  const queryClient = new QueryClient();
-  render(
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
     <QueryClientProvider client={queryClient}>
       <TimeFormatProvider>
         <App />
       </TimeFormatProvider>
     </QueryClientProvider>
   );
-  const heading = screen.getByText(/T1D Profile Manager/i);
-  expect(heading).toBeInTheDocument();
-  
-  // Also check if navigation buttons are present
+}
+
+test('renders main heading', async () => {
+  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  renderApp();
+  expect(screen.getByText(/T1D Profile Manager/i)).toBeInTheDocument();
   expect(screen.getByText(/Create New Profile/i)).toBeInTheDocument();
+});
+
+// ── strictArray role validation ────────────────────────────────────────────────
+
+test('admin nav button is shown when roles is an array containing ADMIN', async () => {
+  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  renderApp({
+    access_token: buildFakeJwt({ roles: ['ADMIN'] }),
+  });
+  await waitFor(() =>
+    expect(screen.getByText(/Manage Insulins/i)).toBeInTheDocument()
+  );
+});
+
+test('admin nav button is NOT shown when roles claim is a plain string "ADMIN"', async () => {
+  // A crafted token where roles is a scalar string instead of an array — must be rejected
+  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  renderApp({
+    access_token: buildFakeJwt({ roles: 'ADMIN' }),
+  });
+  await waitFor(() => screen.getByText(/T1D Profile Manager/i));
+  expect(screen.queryByText(/Manage Insulins/i)).not.toBeInTheDocument();
+});
+
+test('admin nav button is NOT shown when roles array is empty', async () => {
+  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  renderApp({
+    access_token: buildFakeJwt({ roles: [] }),
+  });
+  await waitFor(() => screen.getByText(/T1D Profile Manager/i));
+  expect(screen.queryByText(/Manage Insulins/i)).not.toBeInTheDocument();
+});
+
+test('admin nav button is NOT shown when roles claim is absent', async () => {
+  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  renderApp({
+    access_token: buildFakeJwt({}),
+  });
+  await waitFor(() => screen.getByText(/T1D Profile Manager/i));
+  expect(screen.queryByText(/Manage Insulins/i)).not.toBeInTheDocument();
+});
+
+// ── token sync via useEffect ───────────────────────────────────────────────────
+
+test('setAccessToken is called with the access_token from OIDC user', async () => {
+  const { setAccessToken } = await import('../api/tokenProvider');
+  const spy = vi.spyOn(await import('../api/tokenProvider'), 'setAccessToken');
+  (api.listProfiles as any).mockResolvedValue({ data: [] });
+
+  const token = buildFakeJwt({ roles: [] });
+  renderApp({ access_token: token });
+
+  await waitFor(() => {
+    expect(spy).toHaveBeenCalledWith(token);
+  });
+  spy.mockRestore();
+  void setAccessToken; // silence unused import warning
 });

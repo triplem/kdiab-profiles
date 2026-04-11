@@ -182,6 +182,67 @@ class ProfileServiceTest {
                 }
 
         @Test
+        fun `activateProfile converts ExposedSQLException to ConflictException`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile =
+                        Profile(
+                                id = profileId,
+                                userId = userId,
+                                name = "Draft",
+                                insulinType = "Fiasp",
+                                durationOfAction = 180,
+                                status = ProfileStatus.DRAFT,
+                                basal = listOf(BasalSegment(kotlinx.datetime.LocalTime(0, 0), 1.0)),
+                                icr = emptyList(),
+                                isf = emptyList(),
+                                targets = emptyList()
+                        )
+
+                coEvery { repository.findById(profileId) } returns profile
+                coEvery { repository.findActiveByUserId(userId) } returns null
+                // Simulate the DB unique-index violation that occurs on a concurrent activation
+                coEvery { repository.activateProfile(any(), any()) } throws
+                        io.mockk.mockk<org.jetbrains.exposed.v1.exceptions.ExposedSQLException>(
+                                relaxed = true
+                        )
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.ConflictException> {
+                        service.activateProfile(userId, profileId)
+                }
+        }
+
+        @Test
+        fun `acceptProposedProfile converts ExposedSQLException to ConflictException`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val profile =
+                        Profile(
+                                id = profileId,
+                                userId = userId,
+                                name = "Proposed",
+                                insulinType = "Fiasp",
+                                durationOfAction = 180,
+                                status = ProfileStatus.PROPOSED,
+                                basal = listOf(BasalSegment(kotlinx.datetime.LocalTime(0, 0), 1.0)),
+                                icr = emptyList(),
+                                isf = emptyList(),
+                                targets = emptyList()
+                        )
+
+                coEvery { repository.findById(profileId) } returns profile
+                coEvery { repository.findActiveByUserId(userId) } returns null
+                coEvery { repository.activateProfile(any(), any()) } throws
+                        io.mockk.mockk<org.jetbrains.exposed.v1.exceptions.ExposedSQLException>(
+                                relaxed = true
+                        )
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.ConflictException> {
+                        service.acceptProposedProfile(userId, profileId)
+                }
+        }
+
+        @Test
         fun `activateProfile throws exception if profile not found`() = runBlocking {
                 val userId = Uuid.random()
                 val profileId = Uuid.random()
@@ -416,8 +477,8 @@ class ProfileServiceTest {
         fun `deleteSegment logic works`() = runBlocking {
                 val userId = Uuid.random()
                 val profileId = Uuid.random()
-                val time = LocalTime(0, 0)
-                val basal = listOf(BasalSegment(time, 1.0))
+                val noonTime = LocalTime(12, 0)
+                val basal = listOf(BasalSegment(LocalTime(0, 0), 1.0), BasalSegment(noonTime, 0.8))
                 val profile =
                         Profile(
                                 id = profileId,
@@ -435,16 +496,16 @@ class ProfileServiceTest {
                 coEvery { repository.findById(profileId) } returns profile
                 coEvery { repository.update(any()) } answers { firstArg() }
 
-                val result = service.deleteSegment(userId, profileId, "basal", time)
-                assert(result.basal.isEmpty())
+                val result = service.deleteSegment(userId, profileId, "basal", noonTime)
+                assertEquals(1, result.basal.size)
         }
 
         @Test
         fun `deleteSegment logic works with copy-on-write for ACTIVE profile`() = runBlocking {
                 val userId = Uuid.random()
                 val profileId = Uuid.random()
-                val time = LocalTime(0, 0)
-                val basal = listOf(BasalSegment(time, 1.0))
+                val noonTime = LocalTime(12, 0)
+                val basal = listOf(BasalSegment(LocalTime(0, 0), 1.0), BasalSegment(noonTime, 0.8))
                 val profile =
                         Profile(
                                 id = profileId,
@@ -462,8 +523,8 @@ class ProfileServiceTest {
                 coEvery { repository.findById(profileId) } returns profile
                 coEvery { repository.updateActiveProfile(any(), any()) } answers { secondArg() }
 
-                val result = service.deleteSegment(userId, profileId, "basal", time)
-                assert(result.basal.isEmpty())
+                val result = service.deleteSegment(userId, profileId, "basal", noonTime)
+                assertEquals(1, result.basal.size)
                 assertEquals(ProfileStatus.ACTIVE, result.status)
                 assert(result.id != profileId)
                 coVerify { repository.updateActiveProfile(match { it.status == ProfileStatus.ARCHIVED }, any()) }
@@ -482,6 +543,27 @@ class ProfileServiceTest {
 
                 assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException> {
                         service.deleteSegment(userId, profileId, "basal", LocalTime(0, 0))
+                }
+        }
+
+        @Test
+        fun `deleteSegment throws when segment not found at given time`() = runBlocking {
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val existingTime = LocalTime(8, 0)
+                val missingTime = LocalTime(14, 0)
+                val basalSegment = org.javafreedom.kdiab.profiles.domain.model.BasalSegment(
+                        startTime = existingTime, value = 0.8
+                )
+                val profile = Profile(
+                        id = profileId, userId = userId, name = "Test", status = ProfileStatus.DRAFT,
+                        basal = listOf(basalSegment), icr = emptyList(), isf = emptyList(),
+                        targets = emptyList(), insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findById(profileId) } returns profile
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException> {
+                        service.deleteSegment(userId, profileId, "basal", missingTime)
                 }
         }
 
@@ -591,7 +673,7 @@ class ProfileServiceTest {
                                 userId = userId,
                                 name = "Test",
                                 status = ProfileStatus.DRAFT,
-                                basal = emptyList(),
+                                basal = listOf(BasalSegment(time, 1.0)),
                                 icr = listOf(IcrSegment(time, 10.0)),
                                 isf = listOf(IsfSegment(time, 20.0)),
                                 targets = listOf(TargetSegment(time, 100.0, 100.0)),

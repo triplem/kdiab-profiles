@@ -10,6 +10,9 @@ import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import kotlin.uuid.Uuid
 import org.javafreedom.kdiab.profiles.domain.model.Role
+import io.github.oshai.kotlinlogging.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 private const val JWK_CACHE_MAX_SIZE = 10L
 private const val JWK_CACHE_EXPIRES_IN = 24L
@@ -29,9 +32,17 @@ fun Application.configureSecurity() {
     val jwtSecret = explicitSecret ?: "secret"
 
     val jwkProvider = if (!isTest) {
-        val jwksUrl = environment.config.propertyOrNull("jwt.jwksUrl")?.getString() 
+        val jwksUrl = environment.config.propertyOrNull("jwt.jwksUrl")?.getString()
             ?: "$jwtDomain/protocol/openid-connect/certs"
-        JwkProviderBuilder(URI(jwksUrl).toURL())
+        val jwksUri = URI(jwksUrl)
+        val isInternal = jwksUri.host == "localhost" ||
+            jwksUri.host == "127.0.0.1" ||
+            (jwksUri.host != null && !jwksUri.host.contains('.'))
+        check(isInternal || jwksUri.scheme == "https") {
+            "JWKS URL must use HTTPS for non-local endpoints (got '$jwksUrl'). " +
+            "Set JWKS_URL to a secure https:// endpoint."
+        }
+        JwkProviderBuilder(jwksUri.toURL())
             .cached(JWK_CACHE_MAX_SIZE, JWK_CACHE_EXPIRES_IN, TimeUnit.HOURS)
             .rateLimited(JWK_RATE_LIMIT_BUCKET_SIZE, JWK_RATE_LIMIT_REFILL_RATE, TimeUnit.MINUTES)
             .build()
@@ -62,17 +73,26 @@ fun Application.configureSecurity() {
                                     ?: emptyList()
                     val roles = rawRoles.mapNotNull { Role.fromString(it) }.toSet()
 
-                    val allowedPatients =
-                           credential
-                                    .payload
-                                    .getClaim("allowed_patients")
-                                    .asList(String::class.java)
-                                    ?.map { Uuid.parse(it) }
-                                    ?.toSet()
-                                    ?: emptySet()
+                    val rawPatients = credential
+                            .payload
+                            .getClaim("allowed_patients")
+                            .asList(String::class.java)
+                            ?: emptyList()
+                    val allowedPatients = rawPatients
+                            .mapNotNull { raw -> runCatching { Uuid.parse(raw) }.getOrNull() }
+                            .toSet()
+
+                    logger.debug {
+                        "JWT validated: userId=$userId roles=$roles " +
+                        "rawAllowedPatients=$rawPatients allowedPatients=$allowedPatients"
+                    }
 
                     UserPrincipal(userId, roles, allowedPatients)
                 } else {
+                    logger.warn {
+                        "JWT rejected: audience mismatch " +
+                        "(expected=$jwtAudience actual=${credential.payload.audience})"
+                    }
                     null
                 }
             }

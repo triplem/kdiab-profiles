@@ -56,10 +56,12 @@ fun Profile.toDomain(): DomainProfile {
         userId = Uuid.parse(this.userId),
         name = this.name,
         insulinType = this.insulinType,
+        units = this.units?.value ?: "mg/dl",
+        timeZone = kotlinx.datetime.TimeZone.UTC,
         durationOfAction = this.durationOfAction,
         status = ProfileStatus.valueOf(this.status.name),
         previousProfileId = this.previousProfileId?.let { Uuid.parse(it) },
-        createdAt = (this.createdAt ?: Clock.System.now().toString()).let { Instant.parse(it) },
+        createdAt = this.createdAt?.let { Instant.parse(it) } ?: Clock.System.now(),
         basal = this.basal?.map {
             org.javafreedom.kdiab.profiles.domain.model.BasalSegment(
                 kotlinx.datetime.LocalTime.parse(it.startTime),
@@ -95,7 +97,9 @@ fun DomainProfile.toApi(): Profile {
         name = this.name,
         previousProfileId = this.previousProfileId?.toString(),
         insulinType = this.insulinType,
+        units = Profile.Units.entries.find { it.value == this.units } ?: Profile.Units.mgSlashDl,
         durationOfAction = this.durationOfAction,
+        timeZone = this.timeZone.id,
         status = Profile.Status.valueOf(this.status.name),
         createdAt = this.createdAt.toString(),
         basal = this.basal.map { BasalSegment(it.startTime.toString(), it.value) },

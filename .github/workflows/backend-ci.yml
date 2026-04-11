@@ -60,7 +60,7 @@ jobs:
         fi
 
     - name: Build and Test
-      run: ./gradlew backend:build backend:cyclonedxBom -Pversion=${{ env.VERSION }}
+      run: ./gradlew backend:check backend:cyclonedxBom -Pversion=${{ env.VERSION }}
 
     - name: SonarCloud Scan
       if: env.SONAR_TOKEN != ''

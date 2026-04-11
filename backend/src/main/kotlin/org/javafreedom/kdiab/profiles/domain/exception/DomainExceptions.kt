@@ -10,3 +10,6 @@ class ResourceNotFoundException(message: String = "Resource not found") : Runtim
 class BusinessValidationException(message: String) : RuntimeException(message)
 
 class DomainException(message: String) : RuntimeException(message)
+
+/** Thrown when a state transition conflicts with a concurrent operation (e.g. two simultaneous activations). */
+class ConflictException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

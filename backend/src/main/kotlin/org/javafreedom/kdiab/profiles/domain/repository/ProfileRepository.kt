@@ -18,7 +18,6 @@ interface ProfileRepository {
             to: Instant
     ): List<Profile>
     suspend fun delete(id: Uuid): Boolean
-    suspend fun deleteAllByUserId(userId: Uuid): Boolean
     suspend fun deleteByUserIdAndStatus(
         userId: Uuid,
         status: ProfileStatus

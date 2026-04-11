@@ -132,8 +132,9 @@ test('proposed profile shows Accept and Reject buttons', async () => {
   });
 });
 
-test('accepting a proposed profile calls acceptProposedProfile', async () => {
+test('accepting a proposed profile calls acceptProposedProfile after confirm', async () => {
   const user = userEvent.setup();
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
   (customApi.acceptProposedProfile as Mock).mockResolvedValue({ data: {} });
   renderList([proposedProfile]);
 
@@ -142,6 +143,7 @@ test('accepting a proposed profile calls acceptProposedProfile', async () => {
   );
   await user.click(screen.getByRole('button', { name: /accept proposed profile doctor proposal/i }));
 
+  expect(window.confirm).toHaveBeenCalled();
   await waitFor(() => expect(customApi.acceptProposedProfile).toHaveBeenCalledWith('user-1', '3'));
 });
 
@@ -172,4 +174,52 @@ test('reject does NOT call API when user cancels confirm', async () => {
 
   expect(window.confirm).toHaveBeenCalled();
   expect(customApi.rejectProposedProfile).not.toHaveBeenCalled();
+});
+
+// ── Proposed section visibility ────────────────────────────────────────────────
+
+test('proposed section is visible when proposals exist', async () => {
+  renderList([...mockProfiles, proposedProfile]);
+
+  await waitFor(() => {
+    expect(screen.getByText(/Pending Doctor Recommendations/i)).toBeInTheDocument();
+    expect(screen.getByText(/Doctor Proposal/i)).toBeInTheDocument();
+  });
+});
+
+test('proposed section is hidden when no proposals exist', async () => {
+  renderList(mockProfiles);
+
+  await waitFor(() => {
+    expect(screen.queryByText(/Pending Doctor Recommendations/i)).not.toBeInTheDocument();
+  });
+});
+
+test('accept proposed profile requires confirmation', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  (customApi.acceptProposedProfile as Mock).mockResolvedValue({ data: {} });
+  renderList([proposedProfile]);
+
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /accept proposed profile doctor proposal/i })).toBeInTheDocument()
+  );
+  await user.click(screen.getByRole('button', { name: /accept proposed profile doctor proposal/i }));
+
+  expect(window.confirm).toHaveBeenCalled();
+  await waitFor(() => expect(customApi.acceptProposedProfile).toHaveBeenCalledWith('user-1', '3'));
+});
+
+test('accept does NOT call API when user cancels confirm', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(window, 'confirm').mockReturnValue(false);
+  renderList([proposedProfile]);
+
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /accept proposed profile doctor proposal/i })).toBeInTheDocument()
+  );
+  await user.click(screen.getByRole('button', { name: /accept proposed profile doctor proposal/i }));
+
+  expect(window.confirm).toHaveBeenCalled();
+  expect(customApi.acceptProposedProfile).not.toHaveBeenCalled();
 });

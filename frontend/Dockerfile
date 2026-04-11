@@ -8,10 +8,8 @@ WORKDIR /app/frontend
 RUN apk add --no-cache openjdk21-jre-headless
 
 # Install dependencies in a separate layer for caching.
-# Uses npm install (not npm ci) so the lock file does not need to be committed
-# before a Docker build. The CI pipeline uses npm ci with the committed lock file.
-COPY frontend/package.json ./
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 
 # Copy the OpenAPI spec (referenced as ../api/openapi.yaml from the frontend workdir)
 COPY api/openapi.yaml /app/api/openapi.yaml
@@ -26,10 +24,12 @@ RUN npm run build
 FROM nginx:alpine
 
 COPY --from=builder /app/frontend/dist /usr/share/nginx/html
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# Template is processed by the nginx entrypoint using envsubst at container startup.
+# Required env vars: KEYCLOAK_URL (browser-facing Keycloak origin), BACKEND_URL (internal backend address).
+COPY frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 
 # Grant permissions for rootless execution
-RUN chown -R nginx:nginx /usr/share/nginx/html /etc/nginx/conf.d \
+RUN chown -R nginx:nginx /usr/share/nginx/html /etc/nginx/conf.d /etc/nginx/templates \
     && mkdir -p /var/cache/nginx /var/run /var/log/nginx \
     && chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx \
     && chmod -R 777 /var/run /var/cache/nginx /var/log/nginx
