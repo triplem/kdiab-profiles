@@ -50,14 +50,6 @@ object Profiles : Table("profiles") {
 
     override val primaryKey = PrimaryKey(id)
 
-    init {
-        index(
-            customIndexName = "IDX_PROFILES_USER_ACTIVE",
-            isUnique = true,
-            columns = arrayOf(userId),
-            filterCondition = { status eq ProfileStatus.ACTIVE }
-        )
-    }
 }
 
 class ExposedProfileRepository(
