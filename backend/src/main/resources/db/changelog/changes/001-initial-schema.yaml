@@ -126,6 +126,8 @@ databaseChangeLog:
   # ── 4. One-ACTIVE-per-user — PostgreSQL (production) ─────────────────────────
   # Partial unique index: only ACTIVE rows compete for the uniqueness slot.
   # DRAFT, ARCHIVED, and PROPOSED profiles are unconstrained.
+  # Rollback: drop the index (structured createIndex changes auto-generate rollback,
+  # but raw SQL blocks require an explicit rollback section).
   - changeSet:
       id: 4
       author: javafreedom
@@ -136,11 +138,17 @@ databaseChangeLog:
               CREATE UNIQUE INDEX IDX_PROFILE_STATUSES_USER_ACTIVE
               ON profile_statuses(user_id)
               WHERE status = 'ACTIVE'
+      rollback:
+        - sql:
+            sql: >-
+              DROP INDEX IF EXISTS IDX_PROFILE_STATUSES_USER_ACTIVE
 
   # ── 5. One-ACTIVE-per-user — H2 (integration / E2E tests) ────────────────────
   # H2 does not support partial/conditional indexes. A virtual generated column
   # equals user_id when status = 'ACTIVE' and NULL otherwise. A unique index on
   # this column enforces the invariant because NULL values are not constrained.
+  # Rollback: drop the index first (H2 also drops it implicitly on column drop,
+  # but being explicit avoids relying on that behaviour), then drop the column.
   - changeSet:
       id: 5
       author: javafreedom
@@ -155,3 +163,11 @@ databaseChangeLog:
             sql: >-
               CREATE UNIQUE INDEX IDX_PROFILE_STATUSES_ACTIVE_USER
               ON profile_statuses(active_user_key)
+      rollback:
+        - sql:
+            sql: >-
+              DROP INDEX IF EXISTS IDX_PROFILE_STATUSES_ACTIVE_USER
+        - sql:
+            sql: >-
+              ALTER TABLE profile_statuses
+              DROP COLUMN IF EXISTS active_user_key
