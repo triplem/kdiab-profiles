@@ -9,6 +9,7 @@ describe('axiosInstance request interceptor', () => {
   function runInterceptor(initialHeaders: Record<string, string> = {}) {
     // axiosInstance.interceptors.request.handlers is the internal array of { fulfilled, rejected }
     // objects. We call the fulfilled handler directly to test what it does to config.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handlers = (axiosInstance.interceptors.request as any).handlers as Array<{
       fulfilled: (cfg: unknown) => unknown;
     } | null>;

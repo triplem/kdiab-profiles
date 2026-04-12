@@ -26,9 +26,8 @@ export function ProfileList({ userId, onSelectProfile, readOnly = false }: Profi
   });
 
   const onMutationError = (err: unknown) => {
-    const msg = (err as any)?.response?.data?.message
-      || (err as any)?.message
-      || 'Operation failed. Please try again.';
+    const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+    const msg = apiErr?.response?.data?.message ?? apiErr?.message ?? 'Operation failed. Please try again.';
     setMutationError(msg);
   };
 

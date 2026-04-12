@@ -1,10 +1,14 @@
 import React, { forwardRef } from 'react';
 import { useTimeFormat } from '../context/TimeFormatContext';
 
+interface TimeChangeEvent {
+  target: { name?: string; value: string };
+}
+
 interface TimeInputProps {
   value?: string;
-  onChange?: (e: any) => void;
-  onBlur?: (e: any) => void;
+  onChange?: (e: TimeChangeEvent) => void;
+  onBlur?: React.FocusEventHandler<HTMLSelectElement>;
   name?: string;
   disabled?: boolean;
 }

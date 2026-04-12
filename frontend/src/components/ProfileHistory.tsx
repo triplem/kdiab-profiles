@@ -143,7 +143,7 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelect
           } else {
             setHistory(historyRes.data);
           }
-        } catch (e) {
+        } catch {
           // Fallback if listProfiles fails — show history without active profile prepended
           setHistory(historyRes.data);
           setActiveProfileWarning('Could not load active profile — history may be incomplete.');

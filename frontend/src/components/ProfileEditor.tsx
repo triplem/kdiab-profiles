@@ -4,10 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { api } from '../api/client';
 import type { CreateProfileRequest, Profile } from '../api/generated';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTimeFormat } from '../context/TimeFormatContext';
 import { TimeInput } from './TimeInput';
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const getNextSegment = <T extends { startTime: string, value: number }>(
   fields: T[], 
   defaultValue: number
@@ -227,6 +228,7 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved, readOnly
     onSuccess: () => {
       onProfileSaved?.();
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (err: any) => {
       console.error(err);
       let errorMessage = "Failed to save profile. Please try again.";
@@ -498,7 +500,7 @@ export function ProfileEditor({ userId, initialProfile, onProfileSaved, readOnly
                 {errors.targets?.[index]?.high && <span role="alert" className="error-text">{errors.targets[index]?.high?.message || "High Error"}</span>}
               </div>
             ))}
-            <button type="button" onClick={() => appendTarget(getNextTargetSegment(getValues('targets') || targetFields as any))}>Add Target Segment</button>
+            <button type="button" onClick={() => appendTarget(getNextTargetSegment(getValues('targets') || (targetFields as { startTime: string; low: number; high: number }[])))}>Add Target Segment</button>
             {errors.targets && <div className="error-text">{errors.targets.message}</div>}
           </div>
         )}

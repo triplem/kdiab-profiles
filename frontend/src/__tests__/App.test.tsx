@@ -32,7 +32,7 @@ function buildFakeJwt(payload: Record<string, unknown>): string {
 }
 
 function renderApp(userOverrides: Record<string, unknown> = {}) {
-  (useAuth as any).mockReturnValue({
+  vi.mocked(useAuth).mockReturnValue({
     isLoading: false,
     error: null,
     isAuthenticated: true,
@@ -59,7 +59,7 @@ function renderApp(userOverrides: Record<string, unknown> = {}) {
 }
 
 test('renders main heading', async () => {
-  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  vi.mocked(api.listProfiles).mockResolvedValue({ data: [] });
   renderApp();
   expect(screen.getByText(/T1D Profile Manager/i)).toBeInTheDocument();
   expect(screen.getByText(/Create New Profile/i)).toBeInTheDocument();
@@ -68,7 +68,7 @@ test('renders main heading', async () => {
 // ── strictArray role validation ────────────────────────────────────────────────
 
 test('admin nav button is shown when roles is an array containing ADMIN', async () => {
-  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  vi.mocked(api.listProfiles).mockResolvedValue({ data: [] });
   renderApp({
     access_token: buildFakeJwt({ roles: ['ADMIN'] }),
   });
@@ -79,7 +79,7 @@ test('admin nav button is shown when roles is an array containing ADMIN', async 
 
 test('admin nav button is NOT shown when roles claim is a plain string "ADMIN"', async () => {
   // A crafted token where roles is a scalar string instead of an array — must be rejected
-  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  vi.mocked(api.listProfiles).mockResolvedValue({ data: [] });
   renderApp({
     access_token: buildFakeJwt({ roles: 'ADMIN' }),
   });
@@ -88,7 +88,7 @@ test('admin nav button is NOT shown when roles claim is a plain string "ADMIN"',
 });
 
 test('admin nav button is NOT shown when roles array is empty', async () => {
-  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  vi.mocked(api.listProfiles).mockResolvedValue({ data: [] });
   renderApp({
     access_token: buildFakeJwt({ roles: [] }),
   });
@@ -97,7 +97,7 @@ test('admin nav button is NOT shown when roles array is empty', async () => {
 });
 
 test('admin nav button is NOT shown when roles claim is absent', async () => {
-  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  vi.mocked(api.listProfiles).mockResolvedValue({ data: [] });
   renderApp({
     access_token: buildFakeJwt({}),
   });
@@ -110,7 +110,7 @@ test('admin nav button is NOT shown when roles claim is absent', async () => {
 test('setAccessToken is called with the access_token from OIDC user', async () => {
   const { setAccessToken } = await import('../api/tokenProvider');
   const spy = vi.spyOn(await import('../api/tokenProvider'), 'setAccessToken');
-  (api.listProfiles as any).mockResolvedValue({ data: [] });
+  vi.mocked(api.listProfiles).mockResolvedValue({ data: [] });
 
   const token = buildFakeJwt({ roles: [] });
   renderApp({ access_token: token });

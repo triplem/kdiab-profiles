@@ -3,11 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { Insulin } from '../api/generated';
 
-interface AdminInsulinManagerProps {
-  // If we wanted to pass specific admin tokens or anything, we could here
-}
-
-export const AdminInsulinManager: React.FC<AdminInsulinManagerProps> = () => {
+export const AdminInsulinManager: React.FC = () => {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState<string>('');
@@ -15,9 +11,8 @@ export const AdminInsulinManager: React.FC<AdminInsulinManagerProps> = () => {
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   const onMutationError = (err: unknown) => {
-    const msg = (err as any)?.response?.data?.message
-      || (err as any)?.message
-      || 'Operation failed. Please try again.';
+    const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+    const msg = apiErr?.response?.data?.message ?? apiErr?.message ?? 'Operation failed. Please try again.';
     setMutationError(msg);
   };
 

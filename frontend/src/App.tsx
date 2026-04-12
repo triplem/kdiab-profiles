@@ -97,6 +97,7 @@ function App() {
   }
 
   return (
+    <ErrorBoundary>
     <div className="app-container">
       <div className="app-header">
         <h1>T1D Profile Manager</h1>
@@ -159,6 +160,7 @@ function App() {
         {view === 'admin' && <AdminInsulinManager />}
       </main>
     </div>
+    </ErrorBoundary>
   )
 }
 

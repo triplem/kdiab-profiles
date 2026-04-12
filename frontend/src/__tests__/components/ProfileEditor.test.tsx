@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { ProfileEditor } from '../../components/ProfileEditor';
 import { api } from '../../api/client';
 import { vi, test, expect, Mock } from 'vitest';
