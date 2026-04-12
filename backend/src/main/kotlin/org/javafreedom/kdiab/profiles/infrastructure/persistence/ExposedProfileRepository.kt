@@ -31,6 +31,11 @@ data class ProfileSegments(
     val targets: List<TargetSegment> = emptyList()
 )
 
+/**
+ * Immutable profile data. Status is tracked separately in [ProfileStatuses].
+ * Once written, rows in this table are never mutated — copy-on-write semantics
+ * ensure a new row is created on every effective change to an active profile.
+ */
 object Profiles : Table("profiles") {
     private const val NAME_LENGTH = 255
     private const val INSULIN_TYPE_LENGTH = 100
@@ -44,45 +49,42 @@ object Profiles : Table("profiles") {
     val units = varchar("units", UNITS_LENGTH).default("mg/dl")
     val durationOfAction = integer("duration_of_action")
     val timeZone = varchar("time_zone", 50)
-    val status = enumerationByName("status", 50, ProfileStatus::class)
     val createdAt = timestamp("created_at")
     val segments = jsonb<ProfileSegments>("segments", Json.Default)
 
     override val primaryKey = PrimaryKey(id)
+}
 
+/**
+ * Mutable lifecycle state for each profile. A profile transitions through
+ * DRAFT → ACTIVE → ARCHIVED (or PROPOSED → ACTIVE/ARCHIVED for doctor-created
+ * profiles) by updating this table only, leaving [Profiles] untouched.
+ *
+ * One-ACTIVE-per-user enforcement:
+ * - **PostgreSQL** (production): partial unique index `IDX_PROFILE_STATUSES_USER_ACTIVE`
+ *   on `user_id WHERE status = 'ACTIVE'`.
+ * - **H2** (integration tests): stored generated column `active_user_key` that
+ *   equals `user_id` when `status = 'ACTIVE'` and `NULL` otherwise, combined with
+ *   a unique index. NULL values are not constrained, so only ACTIVE rows compete.
+ */
+object ProfileStatuses : Table("profile_statuses") {
+    val profileId = uuid("profile_id").references(Profiles.id, onDelete = ReferenceOption.CASCADE)
+    val userId = uuid("user_id")
+    val status = enumerationByName("status", 50, ProfileStatus::class)
+    val updatedAt = timestamp("updated_at")
+
+    override val primaryKey = PrimaryKey(profileId)
 }
 
 class ExposedProfileRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ProfileRepository {
 
-    override suspend fun save(profile: Profile): Profile = withContext(ioDispatcher) {
-        suspendTransaction { insertProfileInTx(profile) }
-    }
-
-    override suspend fun findHistory(
-        userId: Uuid,
-        from: Instant,
-        to: Instant
-    ): List<Profile> = withContext(ioDispatcher) {
-        suspendTransaction {
-            Profiles.selectAll()
-                .where {
-                    (Profiles.userId eq userId) and
-                            (Profiles.status eq ProfileStatus.ARCHIVED) and
-                            (Profiles.createdAt greaterEq
-                                    java.time.Instant.ofEpochMilli(from.toEpochMilliseconds())) and
-                            (Profiles.createdAt lessEq
-                                    java.time.Instant.ofEpochMilli(to.toEpochMilliseconds()))
-                }
-                .orderBy(Profiles.createdAt, SortOrder.DESC)
-                .map { mapToProfile(it) }
-        }
-    }
+    // ── Reads ─────────────────────────────────────────────────────────────────
 
     override suspend fun findById(id: Uuid): Profile? = withContext(ioDispatcher) {
         suspendTransaction {
-            Profiles.selectAll()
+            (Profiles innerJoin ProfileStatuses).selectAll()
                 .where { Profiles.id eq id }
                 .map { mapToProfile(it) }
                 .singleOrNull()
@@ -91,7 +93,7 @@ class ExposedProfileRepository(
 
     override suspend fun findAllByUserId(userId: Uuid): List<Profile> = withContext(ioDispatcher) {
         suspendTransaction {
-            Profiles.selectAll()
+            (Profiles innerJoin ProfileStatuses).selectAll()
                 .where { Profiles.userId eq userId }
                 .orderBy(Profiles.createdAt, SortOrder.DESC)
                 .map { mapToProfile(it) }
@@ -100,26 +102,202 @@ class ExposedProfileRepository(
 
     override suspend fun findActiveByUserId(userId: Uuid): Profile? = withContext(ioDispatcher) {
         suspendTransaction {
-            Profiles.selectAll()
+            (Profiles innerJoin ProfileStatuses).selectAll()
                 .where {
                     (Profiles.userId eq userId) and
-                            (Profiles.status eq ProfileStatus.ACTIVE)
+                        (ProfileStatuses.status eq ProfileStatus.ACTIVE)
                 }
                 .map { mapToProfile(it) }
                 .singleOrNull()
         }
     }
 
+    override suspend fun findHistory(
+        userId: Uuid,
+        from: Instant,
+        to: Instant
+    ): List<Profile> = withContext(ioDispatcher) {
+        suspendTransaction {
+            (Profiles innerJoin ProfileStatuses).selectAll()
+                .where {
+                    (Profiles.userId eq userId) and
+                        (ProfileStatuses.status eq ProfileStatus.ARCHIVED) and
+                        (Profiles.createdAt greaterEq
+                            java.time.Instant.ofEpochMilli(from.toEpochMilliseconds())) and
+                        (Profiles.createdAt lessEq
+                            java.time.Instant.ofEpochMilli(to.toEpochMilliseconds()))
+                }
+                .orderBy(Profiles.createdAt, SortOrder.DESC)
+                .map { mapToProfile(it) }
+        }
+    }
+
+    // ── Writes ────────────────────────────────────────────────────────────────
+
+    override suspend fun save(profile: Profile): Profile = withContext(ioDispatcher) {
+        suspendTransaction {
+            insertProfileInTx(profile)
+            insertStatusInTx(profile)
+            profile
+        }
+    }
+
+    /**
+     * Updates profile data and status in a single transaction.
+     * Profile data is written to [Profiles]; status is written to [ProfileStatuses].
+     * For pure status-only transitions (reject, archive) the data UPDATE is a no-op
+     * at the DB level but keeps the call site uniform.
+     */
     override suspend fun update(profile: Profile): Profile = withContext(ioDispatcher) {
         suspendTransaction { updateProfileInTx(profile) }
     }
 
+    /**
+     * Soft-deletes a profile by archiving it (status → ARCHIVED).
+     * Only the [ProfileStatuses] row is touched; profile data is preserved.
+     */
+    override suspend fun delete(id: Uuid): Boolean = withContext(ioDispatcher) {
+        suspendTransaction {
+            ProfileStatuses.update({ ProfileStatuses.profileId eq id }) {
+                it[status] = ProfileStatus.ARCHIVED
+                it[updatedAt] = java.time.Instant.now()
+            } > 0
+        }
+    }
+
+    /**
+     * Hard-deletes all profiles (and their status rows via CASCADE) matching
+     * [userId] and [status]. Used exclusively for bulk DRAFT cleanup.
+     */
+    override suspend fun deleteByUserIdAndStatus(
+        userId: Uuid,
+        status: ProfileStatus
+    ): Boolean = withContext(ioDispatcher) {
+        suspendTransaction {
+            val profileIds = ProfileStatuses.selectAll()
+                .where {
+                    (ProfileStatuses.userId eq userId) and
+                        (ProfileStatuses.status eq status)
+                }
+                .map { it[ProfileStatuses.profileId] }
+
+            if (profileIds.isEmpty()) return@suspendTransaction false
+
+            // ON DELETE CASCADE on the FK removes the profile_statuses rows automatically.
+            Profiles.deleteWhere { Profiles.id inList profileIds } > 0
+        }
+    }
+
+    /**
+     * Copy-on-Write update for ACTIVE profiles.
+     * Archives the old profile (status-only change) and inserts the new version
+     * as a fresh profile + status row — both in the same transaction.
+     */
+    override suspend fun updateActiveProfile(oldProfile: Profile, newProfile: Profile): Profile =
+        withContext(ioDispatcher) {
+            suspendTransaction {
+                updateStatusInTx(oldProfile.id, ProfileStatus.ARCHIVED)
+                insertProfileInTx(newProfile)
+                insertStatusInTx(newProfile)
+                newProfile
+            }
+        }
+
+    /**
+     * Atomically archives the current active profile (if any) and activates
+     * [newActive]. If [newActive] already has a row in [Profiles] (i.e. a DRAFT
+     * being promoted), only its status entry is updated. If it is a freshly
+     * cloned profile (ARCHIVED → ACTIVE clone), both rows are inserted.
+     *
+     * The DB unique constraint (PostgreSQL partial index / H2 generated column)
+     * ensures at most one ACTIVE profile per user and will throw on concurrent
+     * activation races — the service layer converts that to a 409 Conflict.
+     */
+    override suspend fun activateProfile(oldActive: Profile?, newActive: Profile): Profile =
+        withContext(ioDispatcher) {
+            suspendTransaction {
+                oldActive?.let { updateStatusInTx(it.id, ProfileStatus.ARCHIVED) }
+
+                val exists = Profiles.selectAll()
+                    .where { Profiles.id eq newActive.id }
+                    .count() > 0
+
+                if (exists) {
+                    updateStatusInTx(newActive.id, ProfileStatus.ACTIVE)
+                } else {
+                    insertProfileInTx(newActive)
+                    insertStatusInTx(newActive)
+                }
+
+                newActive
+            }
+        }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private fun insertProfileInTx(profile: Profile) {
+        Profiles.insert {
+            it[Profiles.id] = profile.id
+            it[userId] = profile.userId
+            it[previousProfileId] = profile.previousProfileId
+            it[name] = profile.name
+            it[insulinType] = profile.insulinType
+            it[units] = profile.units
+            it[durationOfAction] = profile.durationOfAction
+            it[timeZone] = profile.timeZone.id
+            it[createdAt] = java.time.Instant.ofEpochMilli(profile.createdAt.toEpochMilliseconds())
+            it[segments] = ProfileSegments(
+                basal = profile.basal,
+                icr = profile.icr,
+                isf = profile.isf,
+                targets = profile.targets
+            )
+        }
+    }
+
+    private fun insertStatusInTx(profile: Profile) {
+        ProfileStatuses.insert {
+            it[profileId] = profile.id
+            it[userId] = profile.userId
+            it[status] = profile.status
+            it[updatedAt] = java.time.Instant.now()
+        }
+    }
+
+    private fun updateProfileInTx(profile: Profile): Profile {
+        Profiles.update({ Profiles.id eq profile.id }) {
+            it[previousProfileId] = profile.previousProfileId
+            it[name] = profile.name
+            it[insulinType] = profile.insulinType
+            it[units] = profile.units
+            it[durationOfAction] = profile.durationOfAction
+            it[timeZone] = profile.timeZone.id
+            it[segments] = ProfileSegments(
+                basal = profile.basal,
+                icr = profile.icr,
+                isf = profile.isf,
+                targets = profile.targets
+            )
+        }
+        updateStatusInTx(profile.id, profile.status)
+        return profile
+    }
+
+    private fun updateStatusInTx(profileId: Uuid, newStatus: ProfileStatus) {
+        ProfileStatuses.update({ ProfileStatuses.profileId eq profileId }) {
+            it[status] = newStatus
+            it[updatedAt] = java.time.Instant.now()
+        }
+    }
+
     private fun mapToProfile(row: ResultRow): Profile {
         val pSectors: ProfileSegments = row[Profiles.segments]
-        val timeZone = try {
+        val tz = try {
             TimeZone.of(row[Profiles.timeZone])
         } catch (e: IllegalTimeZoneException) {
-            logger.warn(e) { "Unknown timezone '${row[Profiles.timeZone]}' for profile ${row[Profiles.id]}, falling back to UTC" }
+            logger.warn(e) {
+                "Unknown timezone '${row[Profiles.timeZone]}' for profile ${row[Profiles.id]}, falling back to UTC"
+            }
             TimeZone.UTC
         }
         return Profile(
@@ -130,96 +308,13 @@ class ExposedProfileRepository(
             insulinType = row[Profiles.insulinType],
             units = row[Profiles.units],
             durationOfAction = row[Profiles.durationOfAction],
-            timeZone = timeZone,
-            status = row[Profiles.status],
+            timeZone = tz,
+            status = row[ProfileStatuses.status],
             createdAt = Instant.fromEpochMilliseconds(row[Profiles.createdAt].toEpochMilli()),
             basal = pSectors.basal,
             icr = pSectors.icr,
             isf = pSectors.isf,
             targets = pSectors.targets
         )
-    }
-
-    override suspend fun delete(id: Uuid): Boolean = withContext(ioDispatcher) {
-        suspendTransaction {
-            Profiles.update({ Profiles.id eq id }) {
-                it[Profiles.status] = ProfileStatus.ARCHIVED
-            } > 0
-        }
-    }
-
-    override suspend fun deleteByUserIdAndStatus(
-        userId: Uuid,
-        status: ProfileStatus
-    ): Boolean = withContext(ioDispatcher) {
-        suspendTransaction {
-            Profiles.deleteWhere {
-                (Profiles.userId eq userId) and (Profiles.status eq status)
-            } > 0
-        }
-    }
-
-    override suspend fun updateActiveProfile(oldProfile: Profile, newProfile: Profile): Profile =
-        withContext(ioDispatcher) {
-            suspendTransaction {
-                updateProfileInTx(oldProfile)
-                insertProfileInTx(newProfile)
-            }
-        }
-
-    override suspend fun activateProfile(oldActive: Profile?, newActive: Profile): Profile =
-        withContext(ioDispatcher) {
-            suspendTransaction {
-                oldActive?.let { updateProfileInTx(it) }
-                val exists = Profiles.selectAll().where { Profiles.id eq newActive.id }.count() > 0
-                if (exists) updateProfileInTx(newActive) else insertProfileInTx(newActive)
-            }
-        }
-
-    private fun insertProfileInTx(profile: Profile): Profile {
-        val profileSectors =
-            ProfileSegments(
-                basal = profile.basal,
-                icr = profile.icr,
-                isf = profile.isf,
-                targets = profile.targets
-            )
-
-        Profiles.insert {
-            it[Profiles.id] = profile.id
-            it[Profiles.userId] = profile.userId
-            it[Profiles.previousProfileId] = profile.previousProfileId
-            it[Profiles.name] = profile.name
-            it[Profiles.insulinType] = profile.insulinType
-            it[Profiles.units] = profile.units
-            it[Profiles.durationOfAction] = profile.durationOfAction
-            it[Profiles.timeZone] = profile.timeZone.id
-            it[Profiles.status] = profile.status
-            it[Profiles.createdAt] = java.time.Instant.ofEpochMilli(profile.createdAt.toEpochMilliseconds())
-            it[Profiles.segments] = profileSectors
-        }
-        return profile
-    }
-
-    private fun updateProfileInTx(profile: Profile): Profile {
-        val profileSectors =
-            ProfileSegments(
-                basal = profile.basal,
-                icr = profile.icr,
-                isf = profile.isf,
-                targets = profile.targets
-            )
-
-        Profiles.update({ Profiles.id eq profile.id }) {
-            it[Profiles.previousProfileId] = profile.previousProfileId
-            it[Profiles.name] = profile.name
-            it[Profiles.insulinType] = profile.insulinType
-            it[Profiles.units] = profile.units
-            it[Profiles.durationOfAction] = profile.durationOfAction
-            it[Profiles.timeZone] = profile.timeZone.id
-            it[Profiles.status] = profile.status
-            it[Profiles.segments] = profileSectors
-        }
-        return profile
     }
 }

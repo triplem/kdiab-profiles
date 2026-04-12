@@ -1,0 +1,99 @@
+databaseChangeLog:
+
+  # ── Step 1: Create the profile_statuses table ────────────────────────────────
+  # Profiles are now immutable data records. All lifecycle state is tracked in
+  # this dedicated table so that status transitions never touch the profiles row.
+  - changeSet:
+      id: 4-1
+      author: team
+      changes:
+        - createTable:
+            tableName: profile_statuses
+            columns:
+              - column:
+                  name: profile_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                    foreignKeyName: fk_profile_statuses_profile_id
+                    references: profiles(id)
+                    deleteCascade: true
+              - column:
+                  name: user_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+
+  # ── Step 2: Migrate existing status data ─────────────────────────────────────
+  - changeSet:
+      id: 4-2
+      author: team
+      changes:
+        - sql:
+            sql: >-
+              INSERT INTO profile_statuses (profile_id, user_id, status, updated_at)
+              SELECT id, user_id, status, created_at
+              FROM profiles
+
+  # ── Step 3: PostgreSQL — partial unique index (one ACTIVE profile per user) ──
+  # Replaces IDX_PROFILES_USER_ACTIVE which previously lived on the profiles table.
+  - changeSet:
+      id: 4-3
+      author: team
+      dbms: postgresql
+      changes:
+        - sql:
+            sql: >-
+              CREATE UNIQUE INDEX IDX_PROFILE_STATUSES_USER_ACTIVE
+              ON profile_statuses(user_id)
+              WHERE status = 'ACTIVE'
+
+  # ── Step 4: H2 — computed column + unique index ───────────────────────────────
+  # H2 does not support partial/conditional indexes. We instead use a generated
+  # (stored) column that equals user_id when status = 'ACTIVE' and NULL otherwise.
+  # A unique index on this nullable column enforces the same invariant because
+  # NULL values are not subject to uniqueness constraints in H2 (nor PostgreSQL).
+  - changeSet:
+      id: 4-4
+      author: team
+      dbms: h2
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE profile_statuses
+              ADD COLUMN active_user_key UUID
+              GENERATED ALWAYS AS (CASE WHEN status = 'ACTIVE' THEN user_id ELSE NULL END)
+        - sql:
+            sql: >-
+              CREATE UNIQUE INDEX IDX_PROFILE_STATUSES_ACTIVE_USER
+              ON profile_statuses(active_user_key)
+
+  # ── Step 5: PostgreSQL — drop the old partial index on profiles ───────────────
+  - changeSet:
+      id: 4-5
+      author: team
+      dbms: postgresql
+      changes:
+        - dropIndex:
+            indexName: IDX_PROFILES_USER_ACTIVE
+            tableName: profiles
+
+  # ── Step 6: Drop status column from profiles (now owned by profile_statuses) ─
+  - changeSet:
+      id: 4-6
+      author: team
+      changes:
+        - dropColumn:
+            tableName: profiles
+            columnName: status

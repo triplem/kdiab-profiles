@@ -19,12 +19,23 @@ import org.javafreedom.kdiab.profiles.adapters.inbound.web.InsulinRequest
 import org.javafreedom.kdiab.profiles.api.models.Insulin as ApiInsulin
 import org.javafreedom.kdiab.profiles.module
 
+/**
+ * E2E tests for the insulin endpoints.
+ *
+ * The embedded Ktor server uses an H2 in-memory database bootstrapped via Liquibase (through
+ * [DatabaseFactory.init]), so the full migration chain runs — including the initial insulin
+ * reference data in changeset 002 (Humalog, Novolog, Fiasp, Lyumjev, Apidra).
+ * Assertions account for these 5 pre-seeded insulins.
+ */
 class InsulinE2ETest :
     BehaviorSpec({
         val jwtDomain = "https://jwt-provider-domain/"
         val jwtAudience = "jwt-audience"
         val jwtRealm = "kdiab-profiles"
         val jwtSecret = "secret"
+
+        /** Number of insulin types seeded by Liquibase changeset 002. */
+        val seededInsulinCount = 5
 
         fun generateToken(
             userId: Uuid,
@@ -41,7 +52,7 @@ class InsulinE2ETest :
 
         given("A running Profile Service for Insulins") {
             `when`("I fetch and create insulins") {
-                then("It should return an empty list initially, create a new one, and then return it") {
+                then("It should return seeded insulins and allow creating a new one") {
                     testApplication {
                         environment {
                             config = MapApplicationConfig(
@@ -51,7 +62,7 @@ class InsulinE2ETest :
                                 "jwt.secret" to jwtSecret,
                                 "jwt.test" to "true",
                                 "storage.driverClassName" to "org.h2.Driver",
-                                "storage.jdbcUrl" to "jdbc:h2:mem:e2e_insulins;DB_CLOSE_DELAY=-1",
+                                "storage.jdbcUrl" to "jdbc:h2:mem:e2e_insulins;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE",
                                 "storage.username" to "root",
                                 "storage.password" to "password",
                                 "storage.maximumPoolSize" to "3",
@@ -67,25 +78,26 @@ class InsulinE2ETest :
                         val userId = Uuid.random()
                         val token = generateToken(userId)
 
-                        // 1. Fetch all - should be empty initially (seed data handled via Liquibase)
+                        // 1. Fetch all — Liquibase seeds 5 reference insulin types on startup
                         val getResponse = client.get("/api/v1/insulins") {
                             header(HttpHeaders.Authorization, "Bearer $token")
                         }
                         getResponse.status shouldBe HttpStatusCode.OK
-                        val emptyInsulins = getResponse.bodyAsText().let {
+                        val initialInsulins = getResponse.bodyAsText().let {
                             kotlinx.serialization.json.Json.decodeFromString<List<ApiInsulin>>(it)
                         }
-                        emptyInsulins.shouldHaveSize(0)
+                        initialInsulins shouldHaveSize seededInsulinCount
+                        val seededNames = initialInsulins.map { it.name }
+                        seededNames.contains("Humalog") shouldBe true
+                        seededNames.contains("Fiasp") shouldBe true
 
-                        // 2. Create Insulin
+                        // 2. Create a new insulin not in the seed set
                         val createRequest = InsulinRequest(name = "NovoRapid")
                         val createResponse = client.post("/api/v1/insulins") {
                             header(HttpHeaders.Authorization, "Bearer $token")
                             contentType(ContentType.Application.Json)
                             setBody(createRequest)
                         }
-                        println("CREATE RESPONSE STATUS: ${createResponse.status}")
-                        println("CREATE RESPONSE BODY: ${createResponse.bodyAsText()}")
                         createResponse.status shouldBe HttpStatusCode.Created
                         val createdInsulin = createResponse.bodyAsText().let {
                             kotlinx.serialization.json.Json.decodeFromString<ApiInsulin>(it)
@@ -93,7 +105,7 @@ class InsulinE2ETest :
                         createdInsulin.id.shouldNotBeBlank()
                         createdInsulin.name shouldBe "NovoRapid"
 
-                        // 3. Fetch all again - should have 1 item
+                        // 3. Fetch all again — seeded + 1 newly created
                         val getResponse2 = client.get("/api/v1/insulins") {
                             header(HttpHeaders.Authorization, "Bearer $token")
                         }
@@ -101,7 +113,7 @@ class InsulinE2ETest :
                         val insulinList = getResponse2.bodyAsText().let {
                             kotlinx.serialization.json.Json.decodeFromString<List<ApiInsulin>>(it)
                         }
-                        insulinList.shouldHaveSize(1)
+                        insulinList shouldHaveSize (seededInsulinCount + 1)
                         insulinList.map { it.name }.contains("NovoRapid") shouldBe true
                     }
                 }

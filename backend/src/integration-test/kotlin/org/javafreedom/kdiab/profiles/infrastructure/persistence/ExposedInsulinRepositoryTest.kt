@@ -1,44 +1,35 @@
 package org.javafreedom.kdiab.profiles.infrastructure.persistence
 
-import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.v1.core.*
-import org.jetbrains.exposed.v1.core.statements.*
-import org.jetbrains.exposed.v1.jdbc.*
-import org.jetbrains.exposed.v1.jdbc.transactions.*
+import org.jetbrains.exposed.v1.jdbc.Database
 
+/**
+ * Repository-level integration tests for [ExposedInsulinRepository].
+ *
+ * Schema is bootstrapped via Liquibase (see [LiquibaseTestHelper]), including the
+ * initial insulin reference data inserted by changeset 002. Data is cleared before each
+ * test so that row-count assertions are not affected by seeded rows.
+ */
 class ExposedInsulinRepositoryTest {
 
     private lateinit var repository: ExposedInsulinRepository
 
     companion object {
-        init {
-            Database.connect(
-                url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
-                driver = "org.h2.Driver",
-                user = "root",
-                password = ""
-            )
-        }
+        private val db: Database = LiquibaseTestHelper.setup("test_insulin_repo")
     }
 
     @BeforeTest
     fun setup() {
-        transaction { SchemaUtils.create(Insulins) }
+        LiquibaseTestHelper.cleanData(db)
         repository = ExposedInsulinRepository()
     }
 
-    @AfterTest
-    fun tearDown() {
-        transaction { SchemaUtils.drop(Insulins) }
-    }
-
     @Test
-    fun `findAll should return empty initially`() = runBlocking {
+    fun `findAll should return empty list after data cleanup`() = runBlocking {
         val results = repository.findAll()
         assertEquals(0, results.size)
     }
@@ -52,5 +43,17 @@ class ExposedInsulinRepositoryTest {
         val results = repository.findAll()
         assertEquals(1, results.size)
         assertEquals("Novolog", results[0].name)
+    }
+
+    @Test
+    fun `create multiple insulins should all be returned by findAll`() = runBlocking {
+        repository.create("Humalog")
+        repository.create("Fiasp")
+
+        val results = repository.findAll()
+        assertEquals(2, results.size)
+        val names = results.map { it.name }
+        assert(names.contains("Humalog")) { "Expected Humalog in $names" }
+        assert(names.contains("Fiasp")) { "Expected Fiasp in $names" }
     }
 }

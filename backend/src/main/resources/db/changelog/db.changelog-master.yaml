@@ -5,3 +5,5 @@ databaseChangeLog:
       file: db/changelog/changes/002-initial-data.yaml
   - include:
       file: db/changelog/changes/003-fix-insulin-name-length.yaml
+  - include:
+      file: db/changelog/changes/004-profile-status-table.yaml

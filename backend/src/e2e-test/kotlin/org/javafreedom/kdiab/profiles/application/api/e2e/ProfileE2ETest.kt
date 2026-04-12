@@ -58,7 +58,7 @@ class ProfileE2ETest :
                                                                         "storage.driverClassName" to
                                                                                 "org.h2.Driver",
                                                                         "storage.jdbcUrl" to
-                                                                                "jdbc:h2:mem:e2e;DB_CLOSE_DELAY=-1",
+                                                                                "jdbc:h2:mem:e2e;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE",
                                                                         "storage.username" to
                                                                                 "root",
                                                                         "storage.password" to
@@ -97,7 +97,7 @@ class ProfileE2ETest :
                                                                         "storage.driverClassName" to
                                                                                 "org.h2.Driver",
                                                                         "storage.jdbcUrl" to
-                                                                                "jdbc:h2:mem:e2e_history;DB_CLOSE_DELAY=-1",
+                                                                                "jdbc:h2:mem:e2e_history;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE",
                                                                         "storage.username" to
                                                                                 "root",
                                                                         "storage.password" to
