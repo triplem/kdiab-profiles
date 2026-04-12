@@ -1,4 +1,9 @@
 databaseChangeLog:
+
+  # ── 1. profiles ──────────────────────────────────────────────────────────────
+  # Immutable data record for each pump profile version.
+  # Status is intentionally absent: it lives in the profile_statuses table so that
+  # lifecycle transitions never mutate a profile row (see ADR-203).
   - changeSet:
       id: 1
       author: javafreedom
@@ -51,11 +56,6 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: status
-                  type: varchar(50)
-                  constraints:
-                    nullable: false
-              - column:
                   name: created_at
                   type: timestamp
                   constraints:
@@ -66,25 +66,43 @@ databaseChangeLog:
                   constraints:
                     nullable: false
 
-  # Partial unique index — one ACTIVE profile per user.
-  # Restricted to PostgreSQL because H2 (used in integration tests) does not support
-  # conditional/partial indexes. PostgreSQL is required for production deployments.
+  # ── 2. profile_statuses ───────────────────────────────────────────────────────
+  # Mutable lifecycle state per profile. One row per profile; updated on every
+  # status transition (DRAFT → ACTIVE → ARCHIVED, PROPOSED → ACTIVE/ARCHIVED).
+  # ON DELETE CASCADE keeps the tables consistent when DRAFTs are hard-deleted.
   - changeSet:
       id: 2
       author: javafreedom
-      dbms: postgresql
       changes:
-        - createIndex:
-            tableName: profiles
-            indexName: IDX_PROFILES_USER_ACTIVE
+        - createTable:
+            tableName: profile_statuses
             columns:
               - column:
+                  name: profile_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                    foreignKeyName: fk_profile_statuses_profile_id
+                    references: profiles(id)
+                    deleteCascade: true
+              - column:
                   name: user_id
-            unique: true
-      modifySql:
-        - append:
-            value: " WHERE status = 'ACTIVE'"
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
 
+  # ── 3. insulins ───────────────────────────────────────────────────────────────
   - changeSet:
       id: 3
       author: javafreedom
@@ -100,8 +118,40 @@ databaseChangeLog:
                     nullable: false
               - column:
                   name: name
-                  type: varchar(254)
+                  type: varchar(255)
                   constraints:
                     nullable: false
                     unique: true
 
+  # ── 4. One-ACTIVE-per-user — PostgreSQL (production) ─────────────────────────
+  # Partial unique index: only ACTIVE rows compete for the uniqueness slot.
+  # DRAFT, ARCHIVED, and PROPOSED profiles are unconstrained.
+  - changeSet:
+      id: 4
+      author: javafreedom
+      dbms: postgresql
+      changes:
+        - sql:
+            sql: >-
+              CREATE UNIQUE INDEX IDX_PROFILE_STATUSES_USER_ACTIVE
+              ON profile_statuses(user_id)
+              WHERE status = 'ACTIVE'
+
+  # ── 5. One-ACTIVE-per-user — H2 (integration / E2E tests) ────────────────────
+  # H2 does not support partial/conditional indexes. A virtual generated column
+  # equals user_id when status = 'ACTIVE' and NULL otherwise. A unique index on
+  # this column enforces the invariant because NULL values are not constrained.
+  - changeSet:
+      id: 5
+      author: javafreedom
+      dbms: h2
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE profile_statuses
+              ADD COLUMN active_user_key UUID
+              GENERATED ALWAYS AS (CASE WHEN status = 'ACTIVE' THEN user_id ELSE NULL END)
+        - sql:
+            sql: >-
+              CREATE UNIQUE INDEX IDX_PROFILE_STATUSES_ACTIVE_USER
+              ON profile_statuses(active_user_key)

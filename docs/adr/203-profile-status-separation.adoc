@@ -41,13 +41,13 @@ The constraint is enforced at the database level with a database-specific mechan
 `CREATE UNIQUE INDEX IDX_PROFILE_STATUSES_USER_ACTIVE ON profile_statuses(user_id) WHERE status = 'ACTIVE'`
 
 | **H2** (integration tests)
-| Stored generated column + unique index: +
-`active_user_key UUID GENERATED ALWAYS AS (CASE WHEN status = 'ACTIVE' THEN user_id ELSE NULL END) STORED` +
+| Virtual generated column + unique index: +
+`active_user_key UUID GENERATED ALWAYS AS (CASE WHEN status = 'ACTIVE' THEN user_id ELSE NULL END)` +
 `CREATE UNIQUE INDEX IDX_PROFILE_STATUSES_ACTIVE_USER ON profile_statuses(active_user_key)` +
 Because NULL values are not subject to unique-index constraints, only ACTIVE rows compete.
 |===
 
-Both mechanisms are provisioned through Liquibase changesets with `dbms: postgresql` / `dbms: h2` guards (changeset 4-3 and 4-4 respectively).
+Both mechanisms are provisioned through Liquibase changesets with `dbms: postgresql` / `dbms: h2` guards (changesets 4 and 5 in `001-initial-schema.yaml` respectively).
 
 ==== Rationale
 
@@ -60,4 +60,4 @@ Both mechanisms are provisioned through Liquibase changesets with `dbms: postgre
 
 * All queries that previously read `profiles.status` now perform an `INNER JOIN profiles ON profile_statuses.profile_id = profiles.id` to retrieve the status. The extra join is minimal — `profile_id` is the primary key of `profile_statuses`.
 * Any direct SQL / raw Exposed code that inserts into `profiles` must also insert a corresponding row into `profile_statuses` to keep the tables consistent.
-* The migration (changeset `004`) handles the data backfill from `profiles.status` → `profile_statuses` and drops the old column and index.
+* The schema is defined from the start without a `status` column on `profiles` — `profile_statuses` exists as a first-class table in `001-initial-schema.yaml`. No data migration step is needed.
