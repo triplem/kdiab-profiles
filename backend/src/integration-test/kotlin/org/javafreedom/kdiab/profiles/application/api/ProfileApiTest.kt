@@ -296,6 +296,162 @@ class ProfileApiTest {
                 }
         }
 
+        // ── acceptProposedProfile ────────────────────────────────────────────────
+
+        @Test
+        fun `acceptProposedProfile returns 200 on success`() = testApplication {
+                val profileService = mockk<ProfileService>()
+                setupApp(profileService)
+
+                val client = createClient { install(ContentNegotiation) { json() } }
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val token = generateToken(Role.PATIENT, userId)
+
+                val activatedProfile = Profile(
+                        id = profileId,
+                        userId = userId,
+                        name = "Accepted Plan",
+                        status = ProfileStatus.ACTIVE,
+                        insulinType = "Fiasp",
+                        durationOfAction = 180,
+                        basal = emptyList(),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList()
+                )
+                coEvery { profileService.acceptProposedProfile(userId, profileId) } returns activatedProfile
+
+                client.post("/api/v1/users/$userId/profiles/$profileId/accept") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                }.apply {
+                        assertEquals(HttpStatusCode.OK, status)
+                }
+        }
+
+        // ── rejectProposedProfile ────────────────────────────────────────────────
+
+        @Test
+        fun `rejectProposedProfile returns 200 on success`() = testApplication {
+                val profileService = mockk<ProfileService>()
+                setupApp(profileService)
+
+                val client = createClient { install(ContentNegotiation) { json() } }
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val token = generateToken(Role.PATIENT, userId)
+
+                val archivedProfile = Profile(
+                        id = profileId,
+                        userId = userId,
+                        name = "Rejected Plan",
+                        status = ProfileStatus.ARCHIVED,
+                        insulinType = "Fiasp",
+                        durationOfAction = 180,
+                        basal = emptyList(),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList()
+                )
+                coEvery { profileService.rejectProposedProfile(userId, profileId) } returns archivedProfile
+
+                client.post("/api/v1/users/$userId/profiles/$profileId/reject") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                }.apply {
+                        assertEquals(HttpStatusCode.OK, status)
+                }
+        }
+
+        // ── deleteSegment ────────────────────────────────────────────────────────
+
+        @Test
+        fun `deleteSegment returns 200 on success`() = testApplication {
+                val profileService = mockk<ProfileService>()
+                setupApp(profileService)
+
+                val client = createClient { install(ContentNegotiation) { json() } }
+                val userId = Uuid.random()
+                val profileId = Uuid.random()
+                val token = generateToken(Role.PATIENT, userId)
+
+                val updatedProfile = Profile(
+                        id = profileId,
+                        userId = userId,
+                        name = "Profile",
+                        status = ProfileStatus.DRAFT,
+                        insulinType = "Fiasp",
+                        durationOfAction = 180,
+                        basal = emptyList(),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList()
+                )
+                coEvery { profileService.deleteSegment(userId, profileId, "basal", any()) } returns updatedProfile
+
+                client.delete("/api/v1/users/$userId/profiles/$profileId/basal/00:00") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                }.apply {
+                        assertEquals(HttpStatusCode.OK, status)
+                }
+        }
+
+        // ── getProfile: userId mismatch ──────────────────────────────────────────
+
+        @Test
+        fun `getProfile returns 404 when profile belongs to a different user`() = testApplication {
+                val profileService = mockk<ProfileService>()
+                setupApp(profileService)
+
+                val client = createClient { install(ContentNegotiation) { json() } }
+                val userId = Uuid.random()
+                val otherUserId = Uuid.random()
+                val profileId = Uuid.random()
+                val token = generateToken(Role.ADMIN, userId)
+
+                val profileOwnedByOther = Profile(
+                        id = profileId,
+                        userId = otherUserId,
+                        name = "Other's Profile",
+                        status = ProfileStatus.DRAFT,
+                        insulinType = "Fiasp",
+                        durationOfAction = 180,
+                        basal = emptyList(),
+                        icr = emptyList(),
+                        isf = emptyList(),
+                        targets = emptyList()
+                )
+                coEvery { profileService.getProfile(profileId) } returns profileOwnedByOther
+
+                client.get("/api/v1/users/$userId/profiles/$profileId") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                }.apply {
+                        assertEquals(HttpStatusCode.NotFound, status)
+                }
+        }
+
+        // ── ExposedSQLException handling ─────────────────────────────────────────
+
+        @Test
+        fun `getProfiles returns 500 on unexpected database error`() = testApplication {
+                val profileService = mockk<ProfileService>()
+                setupApp(profileService)
+
+                val client = createClient { install(ContentNegotiation) { json() } }
+                val userId = Uuid.random()
+                val token = generateToken(Role.PATIENT, userId)
+
+                val sqlException = java.sql.SQLException("Unexpected DB error", "99999")
+                val mockTransaction = io.mockk.mockk<org.jetbrains.exposed.v1.core.Transaction>(relaxed = true)
+                val exposedEx = org.jetbrains.exposed.v1.exceptions.ExposedSQLException(sqlException, emptyList(), mockTransaction)
+                coEvery { profileService.getProfiles(userId) } throws exposedEx
+
+                client.get("/api/v1/users/$userId/profiles") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                }.apply {
+                        assertEquals(HttpStatusCode.InternalServerError, status)
+                }
+        }
+
         private fun ApplicationTestBuilder.setupApp(service: ProfileService) {
                 environment {
                         config =

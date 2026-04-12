@@ -100,11 +100,11 @@ jobs:
       with:
         name: backend-image
         path: /tmp/backend-image.tar
-        retention-days: 1
+        retention-days: 7
 
     - name: Upload SBOM
       uses: actions/upload-artifact@v4
       with:
         name: backend-bom
         path: backend/build/reports/cyclonedx/bom.json
-        retention-days: 1
+        retention-days: 7

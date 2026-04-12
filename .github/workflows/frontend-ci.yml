@@ -113,11 +113,11 @@ jobs:
       with:
         name: frontend-image
         path: /tmp/frontend-image.tar
-        retention-days: 1
+        retention-days: 7
 
     - name: Upload SBOM
       uses: actions/upload-artifact@v4
       with:
         name: frontend-bom
         path: frontend/frontend-bom.json
-        retention-days: 1
+        retention-days: 7

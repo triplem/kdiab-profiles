@@ -135,7 +135,7 @@ class ProfileRepositoryConstraintTest {
             it[ProfileStatuses.profileId] = profileId
             it[ProfileStatuses.userId] = userId
             it[ProfileStatuses.status] = status
-            it[updatedAt] = java.time.Instant.now()
+            it[validFrom] = java.time.Instant.now()
         }
     }
 

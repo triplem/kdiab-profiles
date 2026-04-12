@@ -71,7 +71,7 @@ object ProfileStatuses : Table("profile_statuses") {
     val profileId = uuid("profile_id").references(Profiles.id, onDelete = ReferenceOption.CASCADE)
     val userId = uuid("user_id")
     val status = enumerationByName("status", 50, ProfileStatus::class)
-    val updatedAt = timestamp("updated_at")
+    val validFrom = timestamp("valid_from")
 
     override val primaryKey = PrimaryKey(profileId)
 }
@@ -160,7 +160,7 @@ class ExposedProfileRepository(
         suspendTransaction {
             ProfileStatuses.update({ ProfileStatuses.profileId eq id }) {
                 it[status] = ProfileStatus.ARCHIVED
-                it[updatedAt] = java.time.Instant.now()
+                it[validFrom] = java.time.Instant.now()
             } > 0
         }
     }
@@ -260,7 +260,7 @@ class ExposedProfileRepository(
             it[profileId] = profile.id
             it[userId] = profile.userId
             it[status] = profile.status
-            it[updatedAt] = java.time.Instant.now()
+            it[validFrom] = java.time.Instant.now()
         }
     }
 
@@ -286,7 +286,7 @@ class ExposedProfileRepository(
     private fun updateStatusInTx(profileId: Uuid, newStatus: ProfileStatus) {
         ProfileStatuses.update({ ProfileStatuses.profileId eq profileId }) {
             it[status] = newStatus
-            it[updatedAt] = java.time.Instant.now()
+            it[validFrom] = java.time.Instant.now()
         }
     }
 

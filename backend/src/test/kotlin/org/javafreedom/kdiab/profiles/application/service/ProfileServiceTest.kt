@@ -40,6 +40,7 @@ class ProfileServiceTest {
                                 targets = emptyList()
                         )
 
+                coEvery { repository.findAllByUserId(userId) } returns emptyList()
                 coEvery { repository.save(any()) } returns profile
 
                 val result = service.createProfile(profile)
@@ -584,6 +585,7 @@ class ProfileServiceTest {
                         )
 
                 coEvery { repository.findById(profile.id) } returns profile
+                coEvery { repository.findAllByUserId(userId) } returns emptyList()
                 coEvery { repository.update(profile) } returns profile
                 val result = service.updateProfile(profile)
                 assertEquals(profile, result)
@@ -619,6 +621,7 @@ class ProfileServiceTest {
                         insulinType = "Fiasp", durationOfAction = 180
                 )
                 coEvery { repository.findById(profileId) } returns profile
+                coEvery { repository.findAllByUserId(userId) } returns emptyList()
                 coEvery { repository.updateActiveProfile(any(), any()) } answers { secondArg() }
 
                 val updated = profile.copy(name = "Updated Active")
@@ -695,5 +698,105 @@ class ProfileServiceTest {
                 // Targets
                 val res3 = service.deleteSegment(userId, profileId, "targets", time)
                 assert(res3.targets.isEmpty())
+        }
+
+        // ── Name uniqueness ───────────────────────────────────────────────────────
+
+        @Test
+        fun `createProfile throws ConflictException when name already used by non-archived profile`() = runBlocking {
+                val userId = Uuid.random()
+                val existingDraft = Profile(
+                        userId = userId, name = "Basal Plan",
+                        status = ProfileStatus.DRAFT,
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                val newProfile = Profile(
+                        userId = userId, name = "Basal Plan",
+                        status = ProfileStatus.DRAFT,
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.5)),
+                        icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findAllByUserId(userId) } returns listOf(existingDraft)
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.ConflictException> {
+                        service.createProfile(newProfile)
+                }
+                coVerify(exactly = 0) { repository.save(any()) }
+        }
+
+        @Test
+        fun `createProfile allows name used only by archived profile`() = runBlocking {
+                val userId = Uuid.random()
+                val archived = Profile(
+                        userId = userId, name = "Old Plan",
+                        status = ProfileStatus.ARCHIVED,
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                val newProfile = Profile(
+                        userId = userId, name = "Old Plan",
+                        status = ProfileStatus.DRAFT,
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.5)),
+                        icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findAllByUserId(userId) } returns listOf(archived)
+                coEvery { repository.save(any()) } returns newProfile
+
+                val result = service.createProfile(newProfile)
+
+                assertEquals("Old Plan", result.name)
+                coVerify(exactly = 1) { repository.save(any()) }
+        }
+
+        @Test
+        fun `updateProfile DRAFT throws ConflictException when renaming to existing name`() = runBlocking {
+                val userId = Uuid.random()
+                val existingDraft = Profile(
+                        userId = userId, name = "Morning Plan",
+                        status = ProfileStatus.DRAFT,
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                val profileBeingUpdated = Profile(
+                        userId = userId, name = "Night Plan",
+                        status = ProfileStatus.DRAFT,
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 0.8)),
+                        icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                // User tries to rename profileBeingUpdated to "Morning Plan" which is taken
+                val renamed = profileBeingUpdated.copy(name = "Morning Plan")
+                coEvery { repository.findById(profileBeingUpdated.id) } returns profileBeingUpdated
+                coEvery { repository.findAllByUserId(userId) } returns listOf(existingDraft, profileBeingUpdated)
+
+                assertFailsWith<org.javafreedom.kdiab.profiles.domain.exception.ConflictException> {
+                        service.updateProfile(renamed)
+                }
+        }
+
+        @Test
+        fun `updateProfile DRAFT allows keeping same name`() = runBlocking {
+                val userId = Uuid.random()
+                val profile = Profile(
+                        userId = userId, name = "My Plan",
+                        status = ProfileStatus.DRAFT,
+                        basal = listOf(BasalSegment(LocalTime(0, 0), 1.0)),
+                        icr = emptyList(), isf = emptyList(), targets = emptyList(),
+                        insulinType = "Fiasp", durationOfAction = 180
+                )
+                coEvery { repository.findById(profile.id) } returns profile
+                // Returns itself — must be excluded from the name check
+                coEvery { repository.findAllByUserId(userId) } returns listOf(profile)
+                coEvery { repository.update(any()) } answers { firstArg() }
+
+                val result = service.updateProfile(profile)
+
+                assertEquals("My Plan", result.name)
         }
 }

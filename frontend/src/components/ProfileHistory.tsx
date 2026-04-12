@@ -102,7 +102,7 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelect
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeProfileWarning, setActiveProfileWarning] = useState<string | null>(null);
-  const { formatTime, is24Hour } = useTimeFormat();
+  const { formatTime, is24Hour, locale } = useTimeFormat();
   
   // Default to last 30 days, properly formatted as 'YYYY-MM-DD'
   const [startDate, setStartDate] = useState(() => {
@@ -173,20 +173,22 @@ export const ProfileHistory: React.FC<ProfileHistoryProps> = ({ userId, onSelect
       <div className="filters" style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
         <div>
           <label htmlFor="start-date" style={{ marginRight: '0.5rem' }}>From:</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             id="start-date"
-            value={startDate} 
-            onChange={(e) => setStartDate(e.target.value)} 
+            lang={locale}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
           />
         </div>
         <div>
           <label htmlFor="end-date" style={{ marginRight: '0.5rem' }}>To:</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             id="end-date"
-            value={endDate} 
-            onChange={(e) => setEndDate(e.target.value)} 
+            lang={locale}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
       </div>

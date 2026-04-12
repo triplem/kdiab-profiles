@@ -5,8 +5,9 @@ import kotlin.uuid.Uuid
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.LocalTime
-import org.javafreedom.kdiab.profiles.domain.model.Profile
+import org.javafreedom.kdiab.profiles.domain.exception.BusinessValidationException
 import org.javafreedom.kdiab.profiles.domain.exception.ConflictException
+import org.javafreedom.kdiab.profiles.domain.model.Profile
 import org.javafreedom.kdiab.profiles.domain.model.ProfileStatus
 import org.javafreedom.kdiab.profiles.domain.repository.ProfileRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -17,6 +18,7 @@ class ProfileService(private val profileRepository: ProfileRepository) {
 
         suspend fun createProfile(profile: Profile): Profile {
                 profile.validate()
+                assertUniqueNameForUser(profile.userId, profile.name)
                 logger.debug { "Saving new profile ${profile.id} for user ${profile.userId}" }
                 return profileRepository.save(profile)
         }
@@ -113,19 +115,19 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                 checkOwnership(existing, profile.userId)
 
                 if (existing.status == ProfileStatus.ARCHIVED) {
-                        throw org.javafreedom.kdiab.profiles.domain.exception
-                                .BusinessValidationException("Cannot update an archived profile")
+                        throw BusinessValidationException("Cannot update an archived profile")
                 }
 
                 if (existing.status == ProfileStatus.PROPOSED) {
-                        throw org.javafreedom.kdiab.profiles.domain.exception
-                                .BusinessValidationException(
-                                        "Cannot directly update a proposed profile — use accept or reject"
-                                )
+                        throw BusinessValidationException(
+                                "Cannot directly update a proposed profile — use accept or reject"
+                        )
                 }
 
                 if (existing.status == ProfileStatus.ACTIVE) {
-                        // Copy-on-Write: Archive existing, save new active version
+                        // Copy-on-Write: Archive existing, save new active version.
+                        // Exclude the current profile from the name check — it is about to be archived.
+                        assertUniqueNameForUser(profile.userId, profile.name, excludeProfileId = existing.id)
                         val archived = existing.copy(status = ProfileStatus.ARCHIVED)
                         val newVersion =
                                 profile.copy(
@@ -134,13 +136,15 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                                         createdAt = Clock.System.now(),
                                         previousProfileId = existing.id
                                 )
-                        logger.debug { 
-                                "Copy-on-write UPDATE: Archived ${existing.id}, " + 
-                                "created new active ${newVersion.id}" 
+                        logger.debug {
+                                "Copy-on-write UPDATE: Archived ${existing.id}, " +
+                                "created new active ${newVersion.id}"
                         }
                         return profileRepository.updateActiveProfile(archived, newVersion)
                 }
 
+                // DRAFT update: exclude self from the uniqueness check
+                assertUniqueNameForUser(profile.userId, profile.name, excludeProfileId = existing.id)
                 logger.debug { "Standard update for profile ${profile.id}" }
                 return profileRepository.update(profile)
         }
@@ -264,6 +268,21 @@ class ProfileService(private val profileRepository: ProfileRepository) {
                 if (profile.userId != userId) {
                         throw org.javafreedom.kdiab.profiles.domain.exception
                                 .AuthorizationException("Profile does not belong to user")
+                }
+        }
+
+        /**
+         * Ensures no non-archived profile belonging to [userId] already uses [name].
+         * [excludeProfileId] is excluded from the search — pass the current profile's ID when
+         * updating so that keeping the same name is allowed.
+         */
+        private suspend fun assertUniqueNameForUser(userId: Uuid, name: String, excludeProfileId: Uuid? = null) {
+                val conflict = profileRepository.findAllByUserId(userId)
+                        .filter { it.status != ProfileStatus.ARCHIVED }
+                        .filter { it.id != excludeProfileId }
+                        .any { it.name == name }
+                if (conflict) {
+                        throw ConflictException("A profile named '$name' already exists for this user")
                 }
         }
 }
