@@ -8,6 +8,8 @@ updates:
     ignore:
       - dependency-name: "org.jetbrains.kotlin*"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "org.cyclonedx.bom"
+        versions: [">= 3.2.3"]
     groups:
       major:
         patterns:
