@@ -5,6 +5,7 @@ on:
     branches: [ "**" ]
     paths:
       - 'backend/**'
+      - 'gradle/**'
       - 'api/openapi.yaml'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
@@ -14,6 +15,7 @@ on:
     branches: [ "**" ]
     paths:
       - 'backend/**'
+      - 'gradle/**'
       - 'api/openapi.yaml'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
